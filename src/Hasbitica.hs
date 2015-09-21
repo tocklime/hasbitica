@@ -23,8 +23,8 @@ import           Data.Scientific            (floatingOrInteger)
 import           Data.Text                  (Text)
 import           Data.Time                  (UTCTime)
 import           Data.Time.Clock.POSIX      (POSIXTime, posixSecondsToUTCTime)
-import           Servant.API                
-import           Servant.Client             
+import           Servant.API
+import           Servant.Client
 import           Servant.Common.Req         (ServantError)
 
 import qualified Data.Text                  as T
@@ -156,9 +156,19 @@ instance FromJSON TaskExt where
 
 instance FromJSON Task where
   parseJSON o = Task <$> parseJSON o <*> parseJSON o
+
+data Status = Up | Down deriving (Eq,Ord,Enum,Show)
+instance FromJSON Status where
+  parseJSON (Object o) = do
+    (s::String) <- o .: "status"
+    case s of
+      "up" -> pure Up
+      "down" -> pure Down
+
 ------------------------------------------------------------------------------
 type HabiticaAPI = "api" :> "v2" :> (
-             RequireAuth :>"user" :> "tasks" :> Get '[JSON] [Task] 
+             "status" :> Get '[JSON] Status
+        :<|> RequireAuth :>"user" :> "tasks" :> Get '[JSON] [Task]
         :<|> RequireAuth :>"user" :> "tasks" :> Capture "taskId" String :> Get '[JSON] Task
 
         )
@@ -166,6 +176,11 @@ type HabiticaAPI = "api" :> "v2" :> (
 habiticaAPI :: Proxy HabiticaAPI
 habiticaAPI = Proxy
 
-getTasks :: HabiticaApiKey -> EitherT ServantError IO [Task]
-getTask :: HabiticaApiKey -> String -> EitherT ServantError IO Task
-(getTasks :<|> getTask) = client habiticaAPI (BaseUrl Https "habitica.com" 443)
+type Habitica a = EitherT ServantError IO a
+
+getStatus :: Habitica Status
+getTasks :: HabiticaApiKey -> Habitica [Task]
+getTask :: HabiticaApiKey -> String -> Habitica Task
+getStatus
+  :<|> getTasks
+  :<|> getTask = client habiticaAPI (BaseUrl Https "habitica.com" 443)
