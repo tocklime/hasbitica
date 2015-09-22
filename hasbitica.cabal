@@ -16,7 +16,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Hasbitica
-  build-depends:       base >= 4.7 && < 5,text,aeson, wreq,lens,servant-client,servant,time,transformers,either,scientific,containers
+  build-depends:       base >= 4.7 && < 5,text,aeson, wreq,lens,servant-client,servant,time,transformers,either,scientific,containers,unordered-containers
   default-language:    Haskell2010
 
 executable hasbitica-exe

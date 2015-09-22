@@ -10,9 +10,10 @@ module Hasbitica
     ,getTasks
     ) where
 import           Control.Arrow
+import Data.Monoid((<>))
 import           Control.Monad              (mzero)
 import           Control.Monad.Trans.Either (EitherT, runEitherT)
-import           Data.Aeson                 (FromJSON, Value (..), parseJSON,
+import           Data.Aeson                 (FromJSON, Value (..), parseJSON, ToJSON, (.=), object, toJSON,
                                              (.:), (.:?))
 import           Data.List                  (filter, map)
 import           Data.Map                   (Map (..), fromList, mapKeys,
@@ -26,6 +27,7 @@ import           Data.Time.Clock.POSIX      (POSIXTime, posixSecondsToUTCTime)
 import           Servant.API
 import           Servant.Client
 import           Servant.Common.Req         (ServantError)
+import qualified Data.HashMap.Strict as HM
 
 import qualified Data.Text                  as T
 import qualified Data.Text.IO               as T
@@ -84,10 +86,14 @@ instance FromJSON Frequency where
   parseJSON (String "weekly") = pure FreqWeekly
   parseJSON _ = mzero
 
-data CheckListItem = CheckListItem {cliText::String, id :: Guid, cliCompleted::Bool} deriving (Show)
+data CheckListItem = CheckListItem {cliText::String, cliId :: Guid, cliCompleted::Bool} deriving (Show)
 instance FromJSON CheckListItem where
   parseJSON (Object o) = CheckListItem <$> o .: "text" <*> o .: "id" <*> o .: "completed"
   parseJSON _ = mzero
+instance ToJSON CheckListItem where
+  toJSON CheckListItem{..} = object [ "text" .= cliText
+                                    , "id" .= cliId
+				    , "completed" .= cliCompleted ]
 
 data DayOfWeek = Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday deriving (Show, Ord, Enum, Eq)
 readDOW :: String -> Maybe DayOfWeek
@@ -153,9 +159,38 @@ instance FromJSON TaskExt where
                      <*> o .:? "date"
                      <*> o .: "collapseChecklist"
                      <*> o .: "checklist"
+instance ToJSON TaskExt where
+  toJSON Reward = object [ "type" .= ("reward"::String) ]
+  toJSON Habit{..} = undefined
+  toJSON Daily{..} = undefined
+  toJSON Todo{..} = object [ "type" .= ("todo"::String)
+                           , "completed" .= completed
+                           , "dateCompleted" .= dateCompleted
+                           , "date" .= dueDate
+                           , "collapseChecklist" .= collapseChecklist
+                           , "checklist" .= checklist ]
+
+mergeValue :: Value -> Value -> Value
+mergeValue (Object a) (Object b) = Object (HM.unionWith mergeValue a b)
+mergeValue a _ = a
 
 instance FromJSON Task where
   parseJSON o = Task <$> parseJSON o <*> parseJSON o
+instance ToJSON Task where
+  toJSON (Task base ext) = mergeValue (toJSON base) (toJSON ext)
+    
+instance ToJSON BaseTask where
+  toJSON BaseTask{..} = object [
+    "id" .= taskId,
+    "dateCreated" .= dateCreated,
+    "text" .= text,
+    "notes" .= notes,
+    "tags" .= tags,
+    "value" .= taskValue,
+    "priority" .= priority,
+    "attribute" .= attribute,
+    "challenge" .= challenge ]
+
 
 data Status = Up | Down deriving (Eq,Ord,Enum,Show)
 instance FromJSON Status where
@@ -170,6 +205,7 @@ type HabiticaAPI = "api" :> "v2" :> (
              "status" :> Get '[JSON] Status
         :<|> RequireAuth :>"user" :> "tasks" :> Get '[JSON] [Task]
         :<|> RequireAuth :>"user" :> "tasks" :> Capture "taskId" String :> Get '[JSON] Task
+        :<|> RequireAuth :> "user" :> "tasks" :> ReqBody '[JSON] Task :> Post '[JSON] Task
 
         )
 
@@ -181,6 +217,12 @@ type Habitica a = EitherT ServantError IO a
 getStatus :: Habitica Status
 getTasks :: HabiticaApiKey -> Habitica [Task]
 getTask :: HabiticaApiKey -> String -> Habitica Task
+postTask :: HabiticaApiKey -> Task -> Habitica Task
 getStatus
   :<|> getTasks
-  :<|> getTask = client habiticaAPI (BaseUrl Https "habitica.com" 443)
+  :<|> getTask 
+  :<|> postTask = client habiticaAPI (BaseUrl Https "habitica.com" 443)
+
+todo :: String -> Task
+todo x = Task (BaseTask "" Nothing x "" (fromList []) 0 0 "" ())
+              (Todo False Nothing Nothing False [])
