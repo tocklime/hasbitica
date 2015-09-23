@@ -10,15 +10,17 @@ module Hasbitica
     ,getTasks
     ) where
 import           Control.Arrow
-import Data.Monoid((<>))
 import           Control.Monad              (mzero)
 import           Control.Monad.Trans.Either (EitherT, runEitherT)
-import           Data.Aeson                 (FromJSON, Value (..), parseJSON, ToJSON, (.=), object, toJSON,
-                                             (.:), (.:?))
+import           Data.Aeson                 (FromJSON, ToJSON, Value (..),
+                                             object, parseJSON, toJSON, (.!=),
+                                             (.:), (.:?), (.=))
+import qualified Data.HashMap.Strict        as HM
 import           Data.List                  (filter, map)
 import           Data.Map                   (Map (..), fromList, mapKeys,
                                              toList)
-import           Data.Maybe                 (fromJust, isJust)
+import           Data.Maybe                 (fromJust, isJust, catMaybes)
+import           Data.Monoid                ((<>))
 import           Data.Proxy                 (Proxy (..))
 import           Data.Scientific            (floatingOrInteger)
 import           Data.Text                  (Text)
@@ -27,7 +29,6 @@ import           Data.Time.Clock.POSIX      (POSIXTime, posixSecondsToUTCTime)
 import           Servant.API
 import           Servant.Client
 import           Servant.Common.Req         (ServantError)
-import qualified Data.HashMap.Strict as HM
 
 import qualified Data.Text                  as T
 import qualified Data.Text.IO               as T
@@ -152,23 +153,23 @@ instance FromJSON TaskExt where
                        <*> o .: "history"
                        <*> o .: "completed"
                        <*> (removeMaybe . mapKeys readDOW <$> o .: "repeat")
-                       <*> o .: "collapseChecklist"
-                       <*> o .: "checklist"
+                       <*> o .:? "collapseChecklist" .!= True
+                       <*> o .:? "checklist" .!= []
       "todo" -> Todo <$> o .: "completed"
                      <*> o .:? "dateCompleted"
                      <*> o .:? "date"
-                     <*> o .: "collapseChecklist"
-                     <*> o .: "checklist"
+                     <*> o .:? "collapseChecklist" .!= True
+                     <*> o .:? "checklist" .!= []
 instance ToJSON TaskExt where
   toJSON Reward = object [ "type" .= ("reward"::String) ]
   toJSON Habit{..} = undefined
   toJSON Daily{..} = undefined
   toJSON Todo{..} = object [ "type" .= ("todo"::String)
-                           , "completed" .= completed
-                           , "dateCompleted" .= dateCompleted
-                           , "date" .= dueDate
-                           , "collapseChecklist" .= collapseChecklist
-                           , "checklist" .= checklist ]
+                           --, "completed" .= completed
+                           --, "dateCompleted" .= dateCompleted
+                           --, "date" .= dueDate
+                           --, "collapseChecklist" .= collapseChecklist
+                           ]--, "checklist" .= checklist ]
 
 mergeValue :: Value -> Value -> Value
 mergeValue (Object a) (Object b) = Object (HM.unionWith mergeValue a b)
@@ -178,18 +179,21 @@ instance FromJSON Task where
   parseJSON o = Task <$> parseJSON o <*> parseJSON o
 instance ToJSON Task where
   toJSON (Task base ext) = mergeValue (toJSON base) (toJSON ext)
-    
+
 instance ToJSON BaseTask where
-  toJSON BaseTask{..} = object [
-    "id" .= taskId,
-    "dateCreated" .= dateCreated,
-    "text" .= text,
-    "notes" .= notes,
-    "tags" .= tags,
-    "value" .= taskValue,
-    "priority" .= priority,
-    "attribute" .= attribute,
-    "challenge" .= challenge ]
+  toJSON BaseTask{..} = object $ catMaybes 
+    [ m (taskId /= "") $ "id" .= taskId --should send this if it's not "", but not otherwise. Also, it should be Maybe TaskId.
+    , m (dateCreated /= Nothing) $ "dateCreated" .= dateCreated --ditto
+    , Just $ "text" .= text
+    , Just $ "notes" .= notes
+    , Just $ "tags" .= tags
+    , Just $ "value" .= taskValue
+    , Just $ "priority" .= priority
+    --, Just $ "attribute" .= attribute
+    , Just $ "challenge" .= challenge
+    ]
+   where m False _ = Nothing
+         m True  a = Just a
 
 
 data Status = Up | Down deriving (Eq,Ord,Enum,Show)
@@ -220,9 +224,9 @@ getTask :: HabiticaApiKey -> String -> Habitica Task
 postTask :: HabiticaApiKey -> Task -> Habitica Task
 getStatus
   :<|> getTasks
-  :<|> getTask 
+  :<|> getTask
   :<|> postTask = client habiticaAPI (BaseUrl Https "habitica.com" 443)
 
 todo :: String -> Task
 todo x = Task (BaseTask "" Nothing x "" (fromList []) 0 0 "" ())
-              (Todo False Nothing Nothing False [])
+              (Todo False Nothing Nothing True [])
