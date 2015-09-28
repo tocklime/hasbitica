@@ -5,8 +5,10 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 module Hasbitica.Api
-    (HabiticaApiKey
-    ,getTasks
+    (getTasks
+    ,postTask
+    ,HabiticaApiKey(..)
+    ,todo
     ) where
 import           Control.Arrow
 import           Control.Monad.Trans.Either (EitherT, runEitherT)
