@@ -28,6 +28,9 @@ executable hasbitica-cli
                      , either
                      , servant-client
                      , bytestring
+                     , directory
+                     , filepath
+                     , aeson
   default-language:    Haskell2010
 
 test-suite hasbitica-test

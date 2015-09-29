@@ -1,0 +1,10 @@
+Version of workspace file format:
+               1
+Time of storage:
+               "Fri Sep 25 19:24:00 BST 2015"
+Name of the workspace:
+               "hasbitica"
+File paths of contained packages:
+               ["hasbitica.cabal"]
+Maybe file path of an active package:
+               Just "hasbitica.cabal"
