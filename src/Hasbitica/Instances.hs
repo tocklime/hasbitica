@@ -18,9 +18,19 @@ import           Data.Maybe            (catMaybes, fromJust, isJust)
 import           Data.Proxy            (Proxy (..))
 import           Data.Scientific       (floatingOrInteger)
 import           Data.Time.Clock.POSIX (POSIXTime, posixSecondsToUTCTime)
-import           Hasbitica.Types
+import           Hasbitica.LensStuff
 import           Servant.API           ((:>), Header)
 import           Servant.Client        (HasClient (..))
+
+readDOW :: String -> Maybe DayOfWeek
+readDOW "m" = Just Monday
+readDOW "t" = Just Tuesday
+readDOW "w" = Just Wednesday
+readDOW "th" = Just Thursday
+readDOW "f" = Just Friday
+readDOW "s" = Just Saturday
+readDOW "su" = Just Sunday
+readDOW _ = Nothing
 
 instance HasClient sub => HasClient (RequireAuth :> sub) where
   type Client (RequireAuth :> sub) = HabiticaApiKey -> Client sub
@@ -72,7 +82,27 @@ instance FromJSON BaseTask where
 
 removeMaybe :: Ord k =>Map (Maybe k) v -> Map k v
 removeMaybe = fromList . Data.List.map (first fromJust) . Data.List.filter (isJust . fst) . toList
+instance FromJSON Sublist where
+  parseJSON (Object o) = Sublist <$> o .:? "checklist" .!= [] <*> o .:? "collapseChecklist" .!= True
+instance ToJSON Sublist where
+  toJSON Sublist{..} = object ["checklist" .= _checklist, "collapseChecklist" .= _collapse]
+instance FromJSON Todo where
+  parseJSON v@(Object o) = Todo <$> parseJSON v
+                              <*> o .: "completed"
+                              <*> o .: "dateCompleted"
+                              <*> o .: "date"
+                              <*> parseJSON v
+instance ToJSON Todo where
+  toJSON Todo{..} = mergeValue (toJSON _todoBase) $ 
+                  mergeValue (toJSON _todoSublist) $ 
+                  object [ "type" .= ("todo"::String)
+                           , "completed" .= _todoCompleted
+                           , "dateCompleted" .= _todoDateCompleted
+                           , "date" .= _todoDueDate
+                         ]
 
+
+{-
 instance FromJSON TaskExt where
   parseJSON (Object o) = do
     (t :: String) <- o .: "type"
@@ -102,27 +132,28 @@ instance ToJSON TaskExt where
                            --, "date" .= dueDate
                            --, "collapseChecklist" .= collapseChecklist
                            ]--, "checklist" .= checklist ]
-
+-}
 mergeValue :: Value -> Value -> Value
 mergeValue (Object a) (Object b) = Object (HM.unionWith mergeValue a b)
 mergeValue a _ = a
-
+{-
 instance FromJSON Task where
   parseJSON o = Task <$> parseJSON o <*> parseJSON o
 instance ToJSON Task where
   toJSON (Task base ext) = mergeValue (toJSON base) (toJSON ext)
+-}
 
 instance ToJSON BaseTask where
   toJSON BaseTask{..} = object $ catMaybes
-    [ m (taskId /= "") $ "id" .= taskId --should send this if it's not "", but not otherwise. Also, it should be Maybe TaskId.
-    , m (isJust dateCreated) $ "dateCreated" .= dateCreated --ditto
-    , Just $ "text" .= text
-    , Just $ "notes" .= notes
-    , Just $ "tags" .= tags
-    , Just $ "value" .= taskValue
-    , Just $ "priority" .= priority
+    [ m (_taskId /= "") $ "id" .= _taskId --should send this if it's not "", but not otherwise. Also, it should be Maybe TaskId.
+    , m (isJust _dateCreated) $ "dateCreated" .= _dateCreated --ditto
+    , Just $ "text" .= _text
+    , Just $ "notes" .= _notes
+    , Just $ "tags" .= _tags
+    , Just $ "value" .= _taskValue
+    , Just $ "priority" .= _priority
     --, Just $ "attribute" .= attribute
-    , Just $ "challenge" .= challenge
+    , Just $ "challenge" .= _challenge
     ]
    where m False _ = Nothing
          m True  a = Just a
