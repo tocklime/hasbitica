@@ -42,7 +42,8 @@ data Status = Up | Down deriving (Eq,Ord,Enum,Show)
 data Sublist = Sublist { _checklist :: [CheckListItem], _collapse :: Bool }
   deriving (Show)
 
-data Habit = Habit { _habitHistory  :: [TaskHistoryItem]
+data Habit = Habit { _habitBase :: BaseTask
+                   , _habitHistory  :: [TaskHistoryItem]
                    , _habitUp :: Bool
                    , _habitDown :: Bool }
   deriving (Show)
