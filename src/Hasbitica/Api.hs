@@ -10,8 +10,12 @@ module Hasbitica.Api
     ,HabiticaApiKey(..)
     ,todo
     ) where
+import           Control.Applicative        ((<|>))
 import           Control.Arrow
 import           Control.Monad.Trans.Either (EitherT, runEitherT)
+import           Data.Aeson                 (FromJSON, ToJSON, Value (..),
+                                             object, parseJSON, toJSON, (.!=),
+                                             (.:), (.:?), (.=))
 import           Data.Map                   (fromList)
 import           Data.Proxy                 (Proxy (..))
 import           Hasbitica.Instances
@@ -19,10 +23,6 @@ import           Hasbitica.LensStuff
 import           Servant.API
 import           Servant.Client             (BaseUrl (..), Scheme (..), client)
 import           Servant.Common.Req         (ServantError)
-import           Data.Aeson            (FromJSON, ToJSON, Value (..), object,
-                                        parseJSON, toJSON, (.!=), (.:), (.:?),
-                                        (.=))
-import Control.Applicative ((<|>))
 
 type HabiticaAPI = "api" :> "v2" :> (
              "status" :> Get '[JSON] Status
@@ -38,10 +38,10 @@ instance ToJSON Task where
   toJSON (TaskDaily t) = undefined --toJSON t
   toJSON (TaskReward t) = undefined --toJSON t
 instance FromJSON Task where
-  parseJSON o = TaskTodo <$> (parseJSON o) 
-            <|> TaskHabit <$>undefined --(parseJSON o) 
-            <|> TaskDaily <$>undefined --(parseJSON o) 
-            <|> TaskReward <$>undefined --(parseJSON o)
+  parseJSON o = TaskTodo <$> parseJSON o
+            <|> TaskHabit <$>parseJSON o
+            <|> TaskDaily <$>parseJSON o
+            <|> TaskReward <$>parseJSON o
 
 habiticaAPI :: Proxy HabiticaAPI
 habiticaAPI = Proxy

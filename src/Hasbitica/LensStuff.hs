@@ -2,15 +2,15 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE TemplateHaskell     #-}
 
 module Hasbitica.LensStuff
      where
-import           Data.Map  (Map (..))
-import           Data.Time (UTCTime)
-import Control.Lens
+import           Control.Lens
+import           Data.Map     (Map (..))
+import           Data.Time    (UTCTime)
 
 data HabiticaApiKey = HabiticaApiKey { authUser :: String, authApiKey :: String }
 
@@ -18,7 +18,7 @@ data RequireAuth
 
 type Guid = String
 
-data TaskHistoryItem = TaskHistoryItem { histValue :: Double, date :: UTCTime }
+data TaskHistoryItem = TaskHistoryItem { _histValue :: Double, _histDate :: UTCTime }
   deriving Show
 
 data BaseTask = BaseTask
@@ -42,26 +42,26 @@ data Status = Up | Down deriving (Eq,Ord,Enum,Show)
 data Sublist = Sublist { _checklist :: [CheckListItem], _collapse :: Bool }
   deriving (Show)
 
-data Habit = Habit { _habitBase :: BaseTask
-                   , _habitHistory  :: [TaskHistoryItem]
-                   , _habitUp :: Bool
-                   , _habitDown :: Bool }
+data Habit = Habit { _habitBase    :: BaseTask
+                   , _habitHistory :: [TaskHistoryItem]
+                   , _habitUp      :: Bool
+                   , _habitDown    :: Bool }
   deriving (Show)
-data Todo = Todo { _todoBase :: BaseTask
-                 , _todoCompleted :: Bool
+data Todo = Todo { _todoBase          :: BaseTask
+                 , _todoCompleted     :: Bool
                  , _todoDateCompleted :: Maybe UTCTime
-                 , _todoDueDate :: Maybe UTCTime
-                 , _todoSublist :: Sublist
+                 , _todoDueDate       :: Maybe UTCTime
+                 , _todoSublist       :: Sublist
                  } deriving (Show)
 
-data Daily = Daily { _dailyBase :: BaseTask
-                   , _dailyFrequency         :: Frequency
-                   , _dailyEveryX            :: Int
-                   , _dailyStartDate         :: Maybe UTCTime
-                   , _dailyHistory           :: [TaskHistoryItem]
-                   , _dailyCompleted         :: Bool
-                   , _dailyRepeat            :: Map DayOfWeek Bool
-                   , _dailySublist      :: Sublist }
+data Daily = Daily { _dailyBase      :: BaseTask
+                   , _dailyFrequency :: Frequency
+                   , _dailyEveryX    :: Int
+                   , _dailyStartDate :: Maybe UTCTime
+                   , _dailyHistory   :: [TaskHistoryItem]
+                   , _dailyCompleted :: Bool
+                   , _dailyRepeat    :: Map DayOfWeek Bool
+                   , _dailySublist   :: Sublist }
   deriving (Show)
 
 
@@ -74,3 +74,4 @@ makeLenses ''Reward
 makeLenses ''Daily
 makeLenses ''Habit
 makeLenses ''Sublist
+makeLenses ''TaskHistoryItem

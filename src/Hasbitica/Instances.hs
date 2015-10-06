@@ -7,11 +7,11 @@
 {-# LANGUAGE TypeOperators       #-}
 module Hasbitica.Instances() where
 import           Control.Arrow         (first)
-import           Control.Monad         (mzero,guard)
+import           Control.Monad         (guard, mzero)
 import           Data.Aeson            (FromJSON, ToJSON, Value (..), object,
                                         parseJSON, toJSON, (.!=), (.:), (.:?),
                                         (.=))
-import Data.Aeson.Types
+import           Data.Aeson.Types
 import qualified Data.HashMap.Strict   as HM
 import           Data.List             (filter, map)
 import           Data.Map              (Map (..), fromList, mapKeys, toList)
@@ -32,6 +32,14 @@ readDOW "f" = Just Friday
 readDOW "s" = Just Saturday
 readDOW "su" = Just Sunday
 readDOW _ = Nothing
+writeDOW :: DayOfWeek -> String
+writeDOW Monday = "m"
+writeDOW Tuesday = "t"
+writeDOW Wednesday = "w"
+writeDOW Thursday = "th"
+writeDOW Friday = "f"
+writeDOW Saturday = "s"
+writeDOW Sunday = "su"
 
 instance HasClient sub => HasClient (RequireAuth :> sub) where
   type Client (RequireAuth :> sub) = HabiticaApiKey -> Client sub
@@ -55,15 +63,21 @@ instance FromJSON TaskHistoryItem where
     TaskHistoryItem <$> o .: "value"
                     <*> (posixSecondsToUTCTime <$> o .: "date")
   parseJSON _ = mzero
+instance ToJSON TaskHistoryItem where
+  toJSON TaskHistoryItem{..} = object [ "value" .= _histValue, "date" .= _histDate ]
 
 instance FromJSON Frequency where
   parseJSON (String "daily") = pure FreqDaily
   parseJSON (String "weekly") = pure FreqWeekly
   parseJSON _ = mzero
+instance ToJSON Frequency where
+  toJSON FreqDaily = String "daily"
+  toJSON FreqWeekly = String "weekly"
 
 instance FromJSON CheckListItem where
   parseJSON (Object o) = CheckListItem <$> o .: "text" <*> o .: "id" <*> o .: "completed"
   parseJSON _ = mzero
+
 instance ToJSON CheckListItem where
   toJSON CheckListItem{..} = object [ "text" .= cliText
                                     , "id" .= cliId
@@ -98,8 +112,8 @@ instance FromJSON Todo where
          <*> o .: "date"
          <*> parseJSON v
 instance ToJSON Todo where
-  toJSON Todo{..} = mergeValue (toJSON _todoBase) $ 
-                  mergeValue (toJSON _todoSublist) $ 
+  toJSON Todo{..} = mergeValue _todoBase $
+                  mergeValue _todoSublist $
                   object [ "type" .= ("todo"::String)
                            , "completed" .= _todoCompleted
                            , "dateCompleted" .= _todoDateCompleted
@@ -110,6 +124,8 @@ instance FromJSON Reward where
   parseJSON v@(Object o) = do
     ("reward" :: String) <- o .: "type"
     Reward <$> parseJSON v
+instance ToJSON Reward where
+  toJSON Reward{..} = mergeValue _rewardBase $ object [ "type" .= ("reward"::String) ]
 
 instance FromJSON Daily where
   parseJSON v@(Object o) = do
@@ -122,6 +138,16 @@ instance FromJSON Daily where
           <*> o .: "completed"
           <*> (removeMaybe . mapKeys readDOW <$> o .: "repeat")
           <*> parseJSON v
+instance ToJSON Daily where
+  toJSON Daily{..} = mergeValue _dailyBase $ mergeValue _dailySublist $ object
+    [ "type" .= ("daily"::String)
+    , "frequency" .= _dailyFrequency
+    , "everyX" .= _dailyEveryX
+    , "startDate" .= _dailyStartDate
+    , "history" .= _dailyHistory
+    , "completed" .= _dailyCompleted
+    , "repeat" .= mapKeys writeDOW _dailyRepeat
+    ]
 instance FromJSON Habit where
   parseJSON v@(Object o) = do
     ("habit" :: String) <- o .: "type"
@@ -129,21 +155,19 @@ instance FromJSON Habit where
           <*> o .: "history"
           <*> o .: "up"
           <*> o .: "down"
-{-
-instance ToJSON TaskExt where
-  toJSON Reward = object [ "type" .= ("reward"::String) ]
-  toJSON Habit{..} = undefined
-  toJSON Daily{..} = undefined
-  toJSON Todo{..} = object [ "type" .= ("todo"::String)
-                           --, "completed" .= completed
-                           --, "dateCompleted" .= dateCompleted
-                           --, "date" .= dueDate
-                           --, "collapseChecklist" .= collapseChecklist
-                           ]--, "checklist" .= checklist ]
--}
-mergeValue :: Value -> Value -> Value
-mergeValue (Object a) (Object b) = Object (HM.unionWith mergeValue a b)
-mergeValue a _ = a
+instance ToJSON Habit where
+  toJSON Habit{..} = mergeValue _habitBase $ object
+    [ "type" .= ("habit"::String)
+    , "history" .= _habitHistory
+    , "up" .= _habitUp
+    , "down" .= _habitDown
+    ]
+
+mergeValue :: ToJSON a => a -> Value -> Value
+mergeValue a (Object b) = case toJSON a of
+  (Object a') -> Object (HM.unionWith mergeValue a' b)
+  _ -> Object b
+mergeValue a _ = toJSON a
 
 instance ToJSON BaseTask where
   toJSON BaseTask{..} = object $ catMaybes

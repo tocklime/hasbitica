@@ -1,15 +1,15 @@
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveGeneric #-}
 module Main where
 
-import Hasbitica.Api
-import Control.Monad.Trans.Either
-import Servant.Common.Req
-import System.Directory (getHomeDirectory)
-import Data.Aeson (decode, FromJSON)
-import System.FilePath.Posix ((</>))
-import GHC.Generics
+import           Control.Monad.Trans.Either
+import           Data.Aeson                 (FromJSON, decode)
 import qualified Data.ByteString.Lazy.Char8 as B
+import           GHC.Generics
+import           Hasbitica.Api
+import           Servant.Common.Req
+import           System.Directory           (getHomeDirectory)
+import           System.FilePath.Posix      ((</>))
 
 data Settings = Settings {address,user,key::String}
   deriving (Show,Generic)
@@ -28,6 +28,6 @@ addTask k t = do
 
 main :: IO ()
 main = do
-  (Just s) <- readSettings 
+  (Just s) <- readSettings
   let k = HabiticaApiKey (user s) (key s)
   addTask k "A HAHAHA" >>= putStrLn
