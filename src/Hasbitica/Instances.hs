@@ -6,12 +6,12 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 module Hasbitica.Instances() where
+import           Control.Applicative   ((<|>))
 import           Control.Arrow         (first)
 import           Control.Monad         (guard, mzero)
 import           Data.Aeson            (FromJSON, ToJSON, Value (..), object,
                                         parseJSON, toJSON, (.!=), (.:), (.:?),
                                         (.=))
-import Control.Applicative ((<|>))
 import           Data.Aeson.Types
 import qualified Data.HashMap.Strict   as HM
 import           Data.List             (filter, map)
@@ -58,18 +58,13 @@ instance FromJSON POSIXTime where
                             Left f -> pure (realToFrac f/1000)
                             Right i -> pure (fromIntegral i/1000)
   parseJSON (String s) = undefined
-  parseJSON x = error ("bad posixtime: "++(show x))
+  parseJSON x = error ("bad posixtime: " ++ show x)
 
 instance FromJSON TaskHistoryItem where
   parseJSON (Object o) =
     TaskHistoryItem <$> o .: "value"
                     <*> ((o .: "date") <|> (posixSecondsToUTCTime <$> o .: "date"))
-{-TODO: Sometimes TaskHistoryItem.date is like
-"2015-09-22T12:11:17.933Z"
-and sometimes it's like
-1443721571951
--}
-  parseJSON x = error ("bad taskHistItem: "++(show x))
+  parseJSON x = error ("bad taskHistItem: " ++ show x)
 instance ToJSON TaskHistoryItem where
   toJSON TaskHistoryItem{..} = object [ "value" .= _histValue, "date" .= _histDate ]
 
