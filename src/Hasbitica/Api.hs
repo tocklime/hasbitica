@@ -19,8 +19,10 @@ import           Control.Arrow
 import           Control.Lens
 import           Control.Monad.Trans.Either (EitherT, runEitherT)
 import           Data.Aeson                 (FromJSON, ToJSON, Value (..),
-                                             object, parseJSON, toJSON, (.!=),
-                                             (.:), (.:?), (.=))
+                                             object, parseJSON, toJSON,
+                                             withObject, (.!=), (.:), (.:?),
+                                             (.=))
+import qualified Data.HashMap.Strict        as HM
 import           Data.Map                   (fromList)
 import           Data.Maybe                 (mapMaybe)
 import           Data.Proxy                 (Proxy (..))
@@ -36,7 +38,8 @@ type HabiticaAPI = "api" :> "v2" :> (
   :<|> RequireAuth :> "user" :> "tasks" :> Get '[JSON] [Task]
   :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Get '[JSON] Task
   :<|> RequireAuth :> "user" :> "tasks" :> ReqBody '[JSON] Task :> Post '[JSON] Task
-  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> ReqBody '[JSON] Task :> Put '[JSON] Task)
+  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> ReqBody '[JSON] Task :> Put '[JSON] Task
+  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Delete '[JSON] NoData)
 
 
 data Task = TaskTodo Todo | TaskHabit Habit | TaskDaily Daily | TaskReward Reward
@@ -58,6 +61,10 @@ instance FromJSON Task where
 
 
 type Habitica a = EitherT ServantError IO a
+data NoData = NoData deriving Show
+instance FromJSON NoData where
+  parseJSON = withObject "NoData" $ \o ->
+                 if HM.null o then pure NoData else fail "Expected empty object"
 
 targetUrl = BaseUrl Https "habitica.com" 443
 
@@ -66,11 +73,14 @@ getTasks :: HabiticaApiKey -> Habitica [Task]
 getTask :: HabiticaApiKey -> String -> Habitica Task
 postTask :: HabiticaApiKey -> Task -> Habitica Task
 updateTask :: HabiticaApiKey -> String -> Task -> Habitica Task
+deleteTask :: HabiticaApiKey -> String -> Habitica NoData
+
 getStatus
   :<|> getTasks
   :<|> getTask
   :<|> postTask
-  :<|> updateTask = client (Proxy :: Proxy HabiticaAPI) targetUrl
+  :<|> updateTask
+  :<|> deleteTask = client (Proxy :: Proxy HabiticaAPI) targetUrl
 
 ---------------------------------------------------------------------
 -- Helper functions
