@@ -68,6 +68,13 @@ data Daily = Daily { _dailyBase      :: BaseTask
 data Reward = Reward { _rewardBase :: BaseTask }
   deriving (Show)
 
+data Task = TaskTodo Todo | TaskHabit Habit | TaskDaily Daily | TaskReward Reward
+  deriving (Show)
+
+class HasBaseTask a where
+   toBase :: a -> BaseTask
+   fromTask :: Task -> Maybe a
+
 makeLenses ''BaseTask
 makeLenses ''Todo
 makeLenses ''Reward

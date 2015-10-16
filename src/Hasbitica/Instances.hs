@@ -193,3 +193,31 @@ instance FromJSON Status where
     case s of
       "up" -> pure Up
       "down" -> pure Down
+
+instance HasBaseTask Todo where
+   toBase = _todoBase
+   fromTask (TaskTodo a) = Just a
+   fromTask _ = Nothing
+
+instance HasBaseTask Habit where
+   toBase = _habitBase
+   fromTask (TaskHabit a) = Just a
+   fromTask _ = Nothing
+
+instance HasBaseTask Daily where
+   toBase = _dailyBase
+   fromTask (TaskDaily a) = Just a
+   fromTask _ = Nothing
+
+instance HasBaseTask Reward where
+   toBase = _rewardBase
+   fromTask (TaskReward a) = Just a
+   fromTask _ = Nothing
+
+instance HasBaseTask Task where
+   toBase (TaskTodo a) = toBase a
+   toBase (TaskHabit a) = toBase a
+   toBase (TaskDaily a) = toBase a
+   toBase (TaskReward a) = toBase a
+   fromTask = Just
+

@@ -24,6 +24,6 @@ readSettings :: IO (Maybe Settings)
 readSettings = fmap (</> ".habitica") getHomeDirectory >>= fmap decode . B.readFile
 
 getApiFromSettings :: IO (Maybe HabiticaApiKey)
-getApiFromSettings = fmap x <$> readSettings 
+getApiFromSettings = fmap x <$> readSettings
   where
     x Settings{..} =  HabiticaApiKey user key

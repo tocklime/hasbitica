@@ -23,6 +23,7 @@ import           Data.Aeson                 (FromJSON, ToJSON, Value (..),
                                              withObject, (.!=), (.:), (.:?),
                                              (.=))
 import qualified Data.HashMap.Strict        as HM
+import           Data.List                  (isInfixOf)
 import           Data.Map                   (fromList)
 import           Data.Maybe                 (mapMaybe)
 import           Data.Proxy                 (Proxy (..))
@@ -42,8 +43,6 @@ type HabiticaAPI = "api" :> "v2" :> (
   :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Delete '[JSON] NoData)
 
 
-data Task = TaskTodo Todo | TaskHabit Habit | TaskDaily Daily | TaskReward Reward
-  deriving (Show)
 
 instance ToJSON Task where
   toJSON (TaskTodo t) = toJSON t
@@ -90,6 +89,8 @@ todo x = TaskTodo $ Todo (BaseTask "" Nothing x "" (fromList []) 0 0 "" ())
           False Nothing Nothing (Sublist [] True)
 
 getTodos :: HabiticaApiKey -> Habitica [Todo]
-getTodos key = filter (\x -> not $ x^.todoCompleted) . mapMaybe f <$> getTasks key
-  where f (TaskTodo x) = Just x
-        f _ = Nothing
+getTodos key = filter (\x -> not $ x^.todoCompleted) . mapMaybe fromTask <$> getTasks key
+
+
+findTasks :: HabiticaApiKey -> String -> Habitica [Task]
+findTasks key s = filter (\x -> s `isInfixOf` (toBase x ^. text))  <$> getTasks key
