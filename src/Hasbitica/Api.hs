@@ -13,6 +13,7 @@ module Hasbitica.Api
     ,HabiticaApiKey(..)
     ,todo
     ,getTodos
+    ,deleteTask
     ) where
 import           Control.Applicative        ((<|>))
 import           Control.Arrow

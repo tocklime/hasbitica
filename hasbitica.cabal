@@ -35,6 +35,7 @@ executable hasbitica-cli
                      , filepath
                      , aeson
                      , lens
+                     , cmdargs
   default-language:    Haskell2010
 
 test-suite hasbitica-test
