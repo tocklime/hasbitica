@@ -14,6 +14,7 @@ module Hasbitica.Api
     ,todo
     ,getTodos
     ,deleteTask
+    ,updateTask
     ) where
 import           Control.Applicative        ((<|>))
 import           Control.Arrow

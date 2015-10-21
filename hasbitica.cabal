@@ -35,6 +35,7 @@ executable hasbitica-cli
                      , filepath
                      , aeson
                      , lens
+                     , time
                      , cmdargs
   default-language:    Haskell2010
 
