@@ -15,6 +15,7 @@ module Hasbitica.Api
     ,getTodos
     ,deleteTask
     ,updateTask
+    ,WithJson(..)
     ) where
 import           Control.Applicative        ((<|>))
 import           Control.Arrow
@@ -38,12 +39,15 @@ import           Servant.Common.Req         (ServantError)
 
 type HabiticaAPI = "api" :> "v2" :> (
        "status" :> Get '[JSON] Status
-  :<|> RequireAuth :> "user" :> "tasks" :> Get '[JSON] [Task]
+  :<|> RequireAuth :> "user" :> "tasks" :> Get '[JSON] (WithJson [Task])
   :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Get '[JSON] Task
   :<|> RequireAuth :> "user" :> "tasks" :> ReqBody '[JSON] Task :> Post '[JSON] Task
   :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> ReqBody '[JSON] Task :> Put '[JSON] Task
   :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Delete '[JSON] NoData)
 
+data WithJson a = WithJson Value a
+instance FromJSON a => FromJSON (WithJson a) where
+  parseJSON v = WithJson v <$> parseJSON v
 
 
 instance ToJSON Task where
@@ -70,7 +74,7 @@ instance FromJSON NoData where
 targetUrl = BaseUrl Https "habitica.com" 443
 
 getStatus :: Habitica Status
-getTasks :: HabiticaApiKey -> Habitica [Task]
+getTasks :: HabiticaApiKey -> Habitica (WithJson [Task])
 getTask :: HabiticaApiKey -> String -> Habitica Task
 postTask :: HabiticaApiKey -> Task -> Habitica Task
 updateTask :: HabiticaApiKey -> String -> Task -> Habitica Task
@@ -91,8 +95,12 @@ todo x = TaskTodo $ Todo (BaseTask "" Nothing x "" (fromList []) 0 0 "" ())
           False Nothing Nothing (Sublist [] True)
 
 getTodos :: HabiticaApiKey -> Habitica [Todo]
-getTodos key = filter (\x -> not $ x^.todoCompleted) . mapMaybe fromTask <$> getTasks key
+getTodos key = filter (\x -> not $ x^.todoCompleted) . mapMaybe fromTask . f <$> getTasks key
+  where
+    f (WithJson _ x) = x
 
 
 findTasks :: HabiticaApiKey -> String -> Habitica [Task]
-findTasks key s = filter (\x -> s `isInfixOf` (toBase x ^. text))  <$> getTasks key
+findTasks key s = filter (\x -> s `isInfixOf` (toBase x ^. text)) . f <$> getTasks key
+  where
+    f (WithJson _ x) = x

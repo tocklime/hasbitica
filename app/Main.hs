@@ -4,7 +4,7 @@ module Main where
 
 import           Control.Lens               ((&), (.~), (^.))
 import           Control.Monad.Trans.Either (runEitherT)
-import           Data.Aeson                 (FromJSON, decode)
+import           Data.Aeson                 (FromJSON, decode,encode)
 import qualified Data.ByteString.Lazy.Char8 as B
 import           Data.Maybe                 (catMaybes, mapMaybe)
 import           Data.Time.Clock            (getCurrentTime)
@@ -37,7 +37,11 @@ main = do
        case x of
          New x -> addTask key x >>= putStrLn
          List -> getAllNotDoneTodos >>= mapM_ (putStrLn . (\(a,b) -> a++" "++b))
-         ListAll -> getAllTodos >>= mapM_ print
+         ListAll -> getAllTodos >>= \(t,list) -> do
+           putStrLn "Raw JSON:"
+           putStrLn t
+           putStrLn "Parsed:"
+           mapM_ print list
          Done x -> doneTask key x >>= putStrLn
          Delete x -> runEitherT (deleteTask key x) >>= print
 
@@ -60,13 +64,13 @@ doneTask k t = do
       fmap show . runEitherT . updateTask k t . TaskTodo $ newTask
     Right x -> return ("Not a todo: "++show x)
 
-getAllTodos :: IO [Todo]
+getAllTodos :: IO (String,[Todo])
 getAllTodos = do
   (Just k) <- getApiFromSettings
   tasks <- runEitherT $ getTasks k
   case tasks of
-    Left err -> return []
-    Right tsks -> return . mapMaybe fromTask $ tsks
+    Left err -> return (show err,[])
+    Right (WithJson v tsks) -> return (B.unpack $ encode v, mapMaybe fromTask tsks)
 
 getAllNotDoneTodos :: IO [(String,String)]
 getAllNotDoneTodos = do

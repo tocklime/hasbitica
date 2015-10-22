@@ -11,6 +11,7 @@ module Hasbitica.LensStuff
 import           Control.Lens
 import           Data.Map     (Map (..))
 import           Data.Time    (UTCTime)
+import Data.Aeson(Value)
 
 data HabiticaApiKey = HabiticaApiKey { authUser :: String, authApiKey :: String }
 
@@ -70,6 +71,7 @@ data Reward = Reward { _rewardBase :: BaseTask }
 
 data Task = TaskTodo Todo | TaskHabit Habit | TaskDaily Daily | TaskReward Reward
   deriving (Show)
+
 
 class HasBaseTask a where
    toBase :: a -> BaseTask
