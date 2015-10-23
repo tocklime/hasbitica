@@ -3,7 +3,6 @@
 module Main where
 
 import           Control.Lens               ((&), (.~), (^.))
-import           Control.Monad.Trans.Either (runEitherT)
 import           Data.Aeson                 (FromJSON, decode,encode)
 import qualified Data.ByteString.Lazy.Char8 as B
 import           Data.Maybe                 (catMaybes, mapMaybe)
@@ -43,39 +42,39 @@ main = do
            putStrLn "Parsed:"
            mapM_ print list
          Done x -> doneTask key x >>= putStrLn
-         Delete x -> runEitherT (deleteTask key x) >>= print
+         Delete x -> runHabitica (deleteTask key x) >>= print
 
 addTask :: HabiticaApiKey -> String -> IO String
 addTask k t = do
-  x <- runEitherT $ postTask k (todo t)
+  x <- runHabitica $ postTask k (todo t)
   case x of
     Left err -> return (B.unpack $ responseBody err)
     Right _ -> return "OK"
 
 doneTask :: HabiticaApiKey -> String -> IO String
 doneTask k t = do
-  x <- runEitherT $ getTask k t
+  x <- runHabitica $ getTask k t
   now <- getCurrentTime
   case x of
     Left x -> return . show $ x
     Right (TaskTodo x) -> do
       let newTask = x & todoCompleted .~ True
                       & todoDateCompleted .~ Just now
-      fmap show . runEitherT . updateTask k t . TaskTodo $ newTask
+      fmap show . runHabitica . updateTask k t . TaskTodo $ newTask
     Right x -> return ("Not a todo: "++show x)
 
 getAllTodos :: IO (String,[Todo])
 getAllTodos = do
   (Just k) <- getApiFromSettings
-  tasks <- runEitherT $ getTasks k
-  case tasks of
+  ans <- runHabiticaWithJson $ getTasks k
+  case ans of
     Left err -> return (show err,[])
-    Right (WithJson v tsks) -> return (B.unpack $ encode v, mapMaybe fromTask tsks)
+    Right (json,tasks) -> return (B.unpack $ encode json, mapMaybe fromTask tasks)
 
 getAllNotDoneTodos :: IO [(String,String)]
 getAllNotDoneTodos = do
   (Just k) <- getApiFromSettings
-  tasks <- runEitherT $ getTodos k
+  tasks <- getTodos k
   case tasks of
     Left err -> return [("ERROR",show err)]
     Right tsks -> do

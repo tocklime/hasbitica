@@ -19,7 +19,22 @@ library
                      , Hasbitica.Instances
                      , Hasbitica.LensStuff
                      , Hasbitica.Settings
-  build-depends:       base >= 4.7 && < 5,text,aeson, wreq,lens,servant-client,servant,time,transformers,either,scientific,containers,unordered-containers,directory,filepath,bytestring
+  build-depends:       base >= 4.7 && < 5
+                     , text
+                     , aeson
+                     , wreq
+                     , lens
+                     , servant-client >= 0.4.4.5
+                     , servant
+                     , time
+                     , transformers
+                     , either
+                     , scientific
+                     , containers
+                     , unordered-containers
+                     , directory
+                     , filepath
+                     , bytestring
   default-language:    Haskell2010
 
 executable hasbitica-cli
@@ -29,7 +44,7 @@ executable hasbitica-cli
   build-depends:       base
                      , hasbitica
                      , either
-                     , servant-client
+                     , servant-client >= 0.4.4.5
                      , bytestring
                      , directory
                      , filepath

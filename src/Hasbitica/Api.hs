@@ -16,6 +16,8 @@ module Hasbitica.Api
     ,deleteTask
     ,updateTask
     ,WithJson(..)
+    ,runHabitica
+    ,runHabiticaWithJson
     ) where
 import           Control.Applicative        ((<|>))
 import           Control.Arrow
@@ -38,12 +40,12 @@ import           Servant.Common.Req         (ServantError)
 
 
 type HabiticaAPI = "api" :> "v2" :> (
-       "status" :> Get '[JSON] Status
+       "status" :> Get '[JSON] (WithJson Status)
   :<|> RequireAuth :> "user" :> "tasks" :> Get '[JSON] (WithJson [Task])
-  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Get '[JSON] Task
-  :<|> RequireAuth :> "user" :> "tasks" :> ReqBody '[JSON] Task :> Post '[JSON] Task
-  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> ReqBody '[JSON] Task :> Put '[JSON] Task
-  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Delete '[JSON] NoData)
+  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Get '[JSON] (WithJson Task)
+  :<|> RequireAuth :> "user" :> "tasks" :> ReqBody '[JSON] Task :> Post '[JSON] (WithJson Task)
+  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> ReqBody '[JSON] Task :> Put '[JSON] (WithJson Task)
+  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Delete '[JSON] (WithJson NoData))
 
 data WithJson a = WithJson Value a
 instance FromJSON a => FromJSON (WithJson a) where
@@ -65,7 +67,17 @@ instance FromJSON Task where
       "daily" -> TaskDaily <$>parseJSON v
 
 
-type Habitica a = EitherT ServantError IO a
+type Habitica a = EitherT ServantError IO (WithJson a)
+
+runHabitica :: Habitica a -> IO (Either ServantError a)
+runHabitica x = right f <$> runEitherT x
+  where
+   f (WithJson _ a) = a
+runHabiticaWithJson :: Habitica a -> IO (Either ServantError (Value,a))
+runHabiticaWithJson x = right f <$> runEitherT x
+  where
+   f (WithJson a b) = (a,b)
+
 data NoData = NoData deriving Show
 instance FromJSON NoData where
   parseJSON = withObject "NoData" $ \o ->
@@ -74,7 +86,7 @@ instance FromJSON NoData where
 targetUrl = BaseUrl Https "habitica.com" 443
 
 getStatus :: Habitica Status
-getTasks :: HabiticaApiKey -> Habitica (WithJson [Task])
+getTasks :: HabiticaApiKey -> Habitica [Task]
 getTask :: HabiticaApiKey -> String -> Habitica Task
 postTask :: HabiticaApiKey -> Task -> Habitica Task
 updateTask :: HabiticaApiKey -> String -> Task -> Habitica Task
@@ -94,13 +106,9 @@ todo :: String -> Task
 todo x = TaskTodo $ Todo (BaseTask "" Nothing x "" (fromList []) 0 0 "" ())
           False Nothing Nothing (Sublist [] True)
 
-getTodos :: HabiticaApiKey -> Habitica [Todo]
-getTodos key = filter (\x -> not $ x^.todoCompleted) . mapMaybe fromTask . f <$> getTasks key
-  where
-    f (WithJson _ x) = x
+getTodos :: HabiticaApiKey -> IO (Either ServantError [Todo])
+getTodos key = right (filter (\x -> not $ x^.todoCompleted) . mapMaybe fromTask) <$> runHabitica ( getTasks key)
 
 
-findTasks :: HabiticaApiKey -> String -> Habitica [Task]
-findTasks key s = filter (\x -> s `isInfixOf` (toBase x ^. text)) . f <$> getTasks key
-  where
-    f (WithJson _ x) = x
+findTasks :: HabiticaApiKey -> String -> IO (Either ServantError [Task])
+findTasks key s = right(filter (\x -> s `isInfixOf` (toBase x ^. text))) <$> runHabitica (getTasks key)
