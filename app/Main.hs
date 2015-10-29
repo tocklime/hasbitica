@@ -36,40 +36,36 @@ main = do
        case x of
          New x -> addTask key x >>= putStrLn
          List -> getAllNotDoneTodos >>= mapM_ (putStrLn . (\(a,b) -> a++" "++b))
-         ListAll -> getAllTodos >>= \(t,list) -> do
-           putStrLn "Raw JSON:"
-           putStrLn t
-           putStrLn "Parsed:"
-           mapM_ print list
+         ListAll -> getAllTodos >>= mapM_ print 
          Done x -> doneTask key x >>= putStrLn
-         Delete x -> runHabitica (deleteTask key x) >>= print
+         Delete x -> runHabitica (deleteTask x key) >>= print
 
 addTask :: HabiticaApiKey -> String -> IO String
 addTask k t = do
-  x <- runHabitica $ postTask k (todo t)
+  x <- runHabitica $ postTask (todo t) k
   case x of
     Left err -> return (B.unpack $ responseBody err)
     Right _ -> return "OK"
 
 doneTask :: HabiticaApiKey -> String -> IO String
 doneTask k t = do
-  x <- runHabitica $ getTask k t
+  x <- runHabitica $ getTask t k
   now <- getCurrentTime
   case x of
     Left x -> return . show $ x
     Right (TaskTodo x) -> do
       let newTask = x & todoCompleted .~ True
                       & todoDateCompleted .~ Just now
-      fmap show . runHabitica . updateTask k t . TaskTodo $ newTask
+      fmap show . runHabitica . updateTask t (TaskTodo newTask) $ k
     Right x -> return ("Not a todo: "++show x)
 
-getAllTodos :: IO (String,[Todo])
+getAllTodos :: IO [Todo]
 getAllTodos = do
   (Just k) <- getApiFromSettings
-  ans <- runHabiticaWithJson $ getTasks k
+  ans <- runHabitica $ getTasks k
   case ans of
-    Left err -> return (show err,[])
-    Right (json,tasks) -> return (B.unpack $ encode json, mapMaybe fromTask tasks)
+    Left err -> return []
+    Right tasks -> return  (mapMaybe fromTask tasks)
 
 getAllNotDoneTodos :: IO [(String,String)]
 getAllNotDoneTodos = do

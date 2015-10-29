@@ -29,6 +29,7 @@ library
                      , time
                      , transformers
                      , either
+                     , mtl
                      , scientific
                      , containers
                      , unordered-containers

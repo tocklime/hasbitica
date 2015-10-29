@@ -15,14 +15,16 @@ module Hasbitica.Api
     ,getTodos
     ,deleteTask
     ,updateTask
-    ,WithJson(..)
     ,runHabitica
-    ,runHabiticaWithJson
     ) where
 import           Control.Applicative        ((<|>))
 import           Control.Arrow
+import           Control.Monad(liftM)
 import           Control.Lens
+import           Control.Monad.Trans (liftIO)
+import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Either (EitherT, runEitherT)
+import           Control.Monad.Trans.Reader (ReaderT, runReaderT, ask)
 import           Data.Aeson                 (FromJSON, ToJSON, Value (..),
                                              object, parseJSON, toJSON,
                                              withObject, (.!=), (.:), (.:?),
@@ -40,17 +42,14 @@ import           Servant.Common.Req         (ServantError)
 
 
 type HabiticaAPI = "api" :> "v2" :> (
-       "status" :> Get '[JSON] (WithJson Status)
-  :<|> RequireAuth :> "user" :> "tasks" :> Get '[JSON] (WithJson [Task])
-  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Get '[JSON] (WithJson Task)
-  :<|> RequireAuth :> "user" :> "tasks" :> ReqBody '[JSON] Task :> Post '[JSON] (WithJson Task)
-  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> ReqBody '[JSON] Task :> Put '[JSON] (WithJson Task)
-  :<|> RequireAuth :> "user" :> "tasks" :> Capture "taskId" String :> Delete '[JSON] (WithJson NoData))
-
-data WithJson a = WithJson Value a
-instance FromJSON a => FromJSON (WithJson a) where
-  parseJSON v = WithJson v <$> parseJSON v
-
+       "status" :> Get '[JSON] Status
+  :<|> "user" :> "tasks" :> (
+       RequireAuth :> Get '[JSON] [Task]
+  :<|> Capture "taskId" String :> RequireAuth :> Get '[JSON] Task
+  :<|> ReqBody '[JSON] Task :> RequireAuth :> Post '[JSON] Task
+  :<|> Capture "taskId" String :> ReqBody '[JSON] Task :> RequireAuth :> Put '[JSON] Task
+  :<|> Capture "taskId" String :> RequireAuth :> Delete '[JSON] NoData)
+  )
 
 instance ToJSON Task where
   toJSON (TaskTodo t) = toJSON t
@@ -66,17 +65,15 @@ instance FromJSON Task where
       "reward" -> TaskReward <$>parseJSON v
       "daily" -> TaskDaily <$>parseJSON v
 
+data HabiticaError = ClientError ServantError
+type HMonad a = ReaderT HabiticaApiKey (EitherT ServantError IO) a
+type HMonad' a = EitherT ServantError (ReaderT HabiticaApiKey IO) a
 
-type Habitica a = EitherT ServantError IO (WithJson a)
+type Habitica a = EitherT ServantError IO a
+type HabiticaAuth a = HabiticaApiKey -> EitherT ServantError IO a
 
 runHabitica :: Habitica a -> IO (Either ServantError a)
-runHabitica x = right f <$> runEitherT x
-  where
-   f (WithJson _ a) = a
-runHabiticaWithJson :: Habitica a -> IO (Either ServantError (Value,a))
-runHabiticaWithJson x = right f <$> runEitherT x
-  where
-   f (WithJson a b) = (a,b)
+runHabitica = runEitherT 
 
 data NoData = NoData deriving Show
 instance FromJSON NoData where
@@ -86,11 +83,11 @@ instance FromJSON NoData where
 targetUrl = BaseUrl Https "habitica.com" 443
 
 getStatus :: Habitica Status
-getTasks :: HabiticaApiKey -> Habitica [Task]
-getTask :: HabiticaApiKey -> String -> Habitica Task
-postTask :: HabiticaApiKey -> Task -> Habitica Task
-updateTask :: HabiticaApiKey -> String -> Task -> Habitica Task
-deleteTask :: HabiticaApiKey -> String -> Habitica NoData
+getTasks :: HabiticaAuth [Task]
+getTask :: String -> HabiticaAuth Task
+postTask :: Task -> HabiticaAuth Task
+updateTask :: String -> Task -> HabiticaAuth Task
+deleteTask :: String -> HabiticaAuth NoData
 
 getStatus
   :<|> getTasks
@@ -98,6 +95,22 @@ getStatus
   :<|> postTask
   :<|> updateTask
   :<|> deleteTask = client (Proxy :: Proxy HabiticaAPI) targetUrl
+
+runHMonad' :: HMonad' a -> HabiticaApiKey -> IO (Either String a)
+runHMonad' x key = left show <$> runReaderT (runEitherT x) key
+
+runHMonad :: HMonad a -> HabiticaApiKey -> IO (Either String a)
+runHMonad x key = left show <$> runEitherT (runReaderT x key)
+
+getTasksM :: HMonad [Task]
+getTasksM = ask >>= lift . getTasks
+
+getTaskM :: String -> HMonad Task
+getTaskM guid = ask >>= lift . getTask guid
+
+updateTaskM :: String -> Task -> HMonad Task
+updateTaskM guid task = ask >>= lift . updateTask guid task
+  
 
 ---------------------------------------------------------------------
 -- Helper functions
