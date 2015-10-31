@@ -103,13 +103,16 @@ runHMonad :: HMonad a -> HabiticaApiKey -> IO (Either String a)
 runHMonad x key = left show <$> runEitherT (runReaderT x key)
 
 getTasksM :: HMonad [Task]
-getTasksM = ask >>= lift . getTasks
-
 getTaskM :: String -> HMonad Task
-getTaskM guid = ask >>= lift . getTask guid
-
+postTaskM :: Task -> HMonad Task
 updateTaskM :: String -> Task -> HMonad Task
+deleteTaskM :: String -> HMonad NoData
+
+getTasksM = ask >>= lift . getTasks
+getTaskM guid = ask >>= lift . getTask guid
+postTaskM t = ask >>= lift . postTask t
 updateTaskM guid task = ask >>= lift . updateTask guid task
+deleteTaskM t = ask >>= lift . deleteTask t
   
 
 ---------------------------------------------------------------------
