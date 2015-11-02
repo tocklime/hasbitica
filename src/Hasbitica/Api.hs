@@ -15,7 +15,7 @@ module Hasbitica.Api
     ,getTodos
     ,deleteTask
     ,updateTask
-    ,runHabitica
+    ,runHMonad
     ) where
 import           Control.Applicative        ((<|>))
 import           Control.Arrow
@@ -82,19 +82,19 @@ instance FromJSON NoData where
 
 targetUrl = BaseUrl Https "habitica.com" 443
 
-getStatus :: Habitica Status
-getTasks :: HabiticaAuth [Task]
-getTask :: String -> HabiticaAuth Task
-postTask :: Task -> HabiticaAuth Task
-updateTask :: String -> Task -> HabiticaAuth Task
-deleteTask :: String -> HabiticaAuth NoData
+getStatus' :: Habitica Status
+getTasks' :: HabiticaAuth [Task]
+getTask' :: String -> HabiticaAuth Task
+postTask' :: Task -> HabiticaAuth Task
+updateTask' :: String -> Task -> HabiticaAuth Task
+deleteTask' :: String -> HabiticaAuth NoData
 
-getStatus
-  :<|> getTasks
-  :<|> getTask
-  :<|> postTask
-  :<|> updateTask
-  :<|> deleteTask = client (Proxy :: Proxy HabiticaAPI) targetUrl
+getStatus'
+  :<|> getTasks'
+  :<|> getTask'
+  :<|> postTask'
+  :<|> updateTask'
+  :<|> deleteTask' = client (Proxy :: Proxy HabiticaAPI) targetUrl
 
 runHMonad' :: HMonad' a -> HabiticaApiKey -> IO (Either String a)
 runHMonad' x key = left show <$> runReaderT (runEitherT x) key
@@ -102,17 +102,17 @@ runHMonad' x key = left show <$> runReaderT (runEitherT x) key
 runHMonad :: HMonad a -> HabiticaApiKey -> IO (Either String a)
 runHMonad x key = left show <$> runEitherT (runReaderT x key)
 
-getTasksM :: HMonad [Task]
-getTaskM :: String -> HMonad Task
-postTaskM :: Task -> HMonad Task
-updateTaskM :: String -> Task -> HMonad Task
-deleteTaskM :: String -> HMonad NoData
+getTasks :: HMonad [Task]
+getTask :: String -> HMonad Task
+postTask :: Task -> HMonad Task
+updateTask :: String -> Task -> HMonad Task
+deleteTask :: String -> HMonad NoData
 
-getTasksM = ask >>= lift . getTasks
-getTaskM guid = ask >>= lift . getTask guid
-postTaskM t = ask >>= lift . postTask t
-updateTaskM guid task = ask >>= lift . updateTask guid task
-deleteTaskM t = ask >>= lift . deleteTask t
+getTasks = ask >>= lift . getTasks'
+getTask guid = ask >>= lift . getTask' guid
+postTask t = ask >>= lift . postTask' t
+updateTask guid task = ask >>= lift . updateTask' guid task
+deleteTask t = ask >>= lift . deleteTask' t
   
 
 ---------------------------------------------------------------------
@@ -122,9 +122,9 @@ todo :: String -> Task
 todo x = TaskTodo $ Todo (BaseTask "" Nothing x "" (fromList []) 0 0 "" ())
           False Nothing Nothing (Sublist [] True)
 
-getTodos :: HabiticaApiKey -> IO (Either ServantError [Todo])
-getTodos key = right (filter (\x -> not $ x^.todoCompleted) . mapMaybe fromTask) <$> runHabitica ( getTasks key)
+getTodos :: HabiticaApiKey -> IO (Either String [Todo])
+getTodos key = right (filter (\x -> not $ x^.todoCompleted) . mapMaybe fromTask) <$> runHMonad getTasks key
 
 
-findTasks :: HabiticaApiKey -> String -> IO (Either ServantError [Task])
-findTasks key s = right(filter (\x -> s `isInfixOf` (toBase x ^. text))) <$> runHabitica (getTasks key)
+findTasks :: HabiticaApiKey -> String -> IO (Either String [Task])
+findTasks key s = right(filter (\x -> s `isInfixOf` (toBase x ^. text))) <$> runHMonad getTasks key

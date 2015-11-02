@@ -38,31 +38,31 @@ main = do
          List -> getAllNotDoneTodos >>= mapM_ (putStrLn . (\(a,b) -> a++" "++b))
          ListAll -> getAllTodos >>= mapM_ print 
          Done x -> doneTask key x >>= putStrLn
-         Delete x -> runHabitica (deleteTask x key) >>= print
+         Delete x -> runHMonad (deleteTask x) key >>= print
 
 addTask :: HabiticaApiKey -> String -> IO String
 addTask k t = do
-  x <- runHabitica $ postTask (todo t) k
+  x <- runHMonad (postTask (todo t)) k
   case x of
-    Left err -> return (B.unpack $ responseBody err)
+    Left err -> return err
     Right _ -> return "OK"
 
 doneTask :: HabiticaApiKey -> String -> IO String
 doneTask k t = do
-  x <- runHabitica $ getTask t k
+  x <- runHMonad (getTask t) k
   now <- getCurrentTime
   case x of
     Left x -> return . show $ x
     Right (TaskTodo x) -> do
       let newTask = x & todoCompleted .~ True
                       & todoDateCompleted .~ Just now
-      fmap show . runHabitica . updateTask t (TaskTodo newTask) $ k
+      fmap show . runHMonad (updateTask t (TaskTodo newTask)) $ k
     Right x -> return ("Not a todo: "++show x)
 
 getAllTodos :: IO [Todo]
 getAllTodos = do
   (Just k) <- getApiFromSettings
-  ans <- runHabitica $ getTasks k
+  ans <- runHMonad getTasks k
   case ans of
     Left err -> return []
     Right tasks -> return  (mapMaybe fromTask tasks)
