@@ -16,6 +16,7 @@ module Hasbitica.Api
     ,deleteTask
     ,updateTask
     ,runHMonad
+    ,HMonad
     ) where
 import           Control.Applicative        ((<|>))
 import           Control.Arrow

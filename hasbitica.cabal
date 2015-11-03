@@ -50,6 +50,7 @@ executable hasbitica-cli
                      , directory
                      , filepath
                      , aeson
+                     , mtl
                      , lens
                      , time
                      , cmdargs

@@ -9,6 +9,7 @@ import           Data.Maybe                 (catMaybes, mapMaybe)
 import           Data.Time.Clock            (getCurrentTime)
 import           Hasbitica.Api
 import           Hasbitica.LensStuff
+import           Control.Monad.Trans (liftIO)
 import           Hasbitica.Settings         (getApiFromSettings)
 import           Servant.Common.Req         (responseBody)
 import           System.Console.CmdArgs
@@ -36,35 +37,30 @@ main = do
        case x of
          New x -> addTask key x >>= putStrLn
          List -> getAllNotDoneTodos >>= mapM_ (putStrLn . (\(a,b) -> a++" "++b))
-         ListAll -> getAllTodos >>= mapM_ print 
-         Done x -> doneTask key x >>= putStrLn
+         ListAll -> getAllTodos key >>= mapM_ print 
+         Done x -> either id id <$> runHMonad (doneTask x) key >>= putStrLn
          Delete x -> runHMonad (deleteTask x) key >>= print
 
 addTask :: HabiticaApiKey -> String -> IO String
-addTask k t = do
-  x <- runHMonad (postTask (todo t)) k
-  case x of
-    Left err -> return err
-    Right _ -> return "OK"
+addTask k t = 
+  either id (const "OK") <$> runHMonad (postTask (todo t)) k
 
-doneTask :: HabiticaApiKey -> String -> IO String
-doneTask k t = do
-  x <- runHMonad (getTask t) k
-  now <- getCurrentTime
-  case x of
-    Left x -> return . show $ x
-    Right (TaskTodo x) -> do
+doneTask :: String -> HMonad String
+doneTask t = do
+  task <- getTask t
+  now <- liftIO getCurrentTime
+  case task of 
+    TaskTodo x -> do
       let newTask = x & todoCompleted .~ True
                       & todoDateCompleted .~ Just now
-      fmap show . runHMonad (updateTask t (TaskTodo newTask)) $ k
-    Right x -> return ("Not a todo: "++show x)
+      show <$> updateTask t (TaskTodo newTask)
+    x -> return ("Not a todo: " ++ show x)
 
-getAllTodos :: IO [Todo]
-getAllTodos = do
-  (Just k) <- getApiFromSettings
+getAllTodos :: HabiticaApiKey -> IO [Todo]
+getAllTodos k = do
   ans <- runHMonad getTasks k
   case ans of
-    Left err -> return []
+    Left err -> print err >> return []
     Right tasks -> return  (mapMaybe fromTask tasks)
 
 getAllNotDoneTodos :: IO [(String,String)]
