@@ -30,20 +30,21 @@ examples = [ New {newTodoText = "Buy milk" &= help "The text of the new todo" }
            , Delete "<GUID>" &= help "Delete todo X"]
              &= program "hasbitica-cli"
 
+myRun :: HMonad a -> HabiticaApiKey -> IO a
+myRun x k = either error id <$> runHMonad x k
+  
+despatch :: HasbiticaCli -> HMonad String
+despatch (New x) = postTask (todo x) >> return "OK"
+despatch List = unlines <$>  map (\(a,b) -> a++" "++b) <$> getAllNotDoneTodos 
+despatch ListAll = show <$> (getAll :: HMonad [Todo])
+despatch (Done x) = doneTask x
+despatch (Delete x) = show <$> deleteTask x 
+
 main :: IO ()
 main = do
        x <- cmdArgs (modes examples)
        (Just key) <- getApiFromSettings
-       case x of
-         New x -> addTask key x >>= putStrLn
-         List -> getAllNotDoneTodos >>= mapM_ (putStrLn . (\(a,b) -> a++" "++b))
-         ListAll -> getAllTodos key >>= mapM_ print 
-         Done x -> either id id <$> runHMonad (doneTask x) key >>= putStrLn
-         Delete x -> runHMonad (deleteTask x) key >>= print
-
-addTask :: HabiticaApiKey -> String -> IO String
-addTask k t = 
-  either id (const "OK") <$> runHMonad (postTask (todo t)) k
+       myRun (despatch x) key >>= putStrLn
 
 doneTask :: String -> HMonad String
 doneTask t = do
@@ -56,20 +57,8 @@ doneTask t = do
       show <$> updateTask t (TaskTodo newTask)
     x -> return ("Not a todo: " ++ show x)
 
-getAllTodos :: HabiticaApiKey -> IO [Todo]
-getAllTodos k = do
-  ans <- runHMonad getTasks k
-  case ans of
-    Left err -> print err >> return []
-    Right tasks -> return  (mapMaybe fromTask tasks)
+getAll :: HasBaseTask a => HMonad [a]
+getAll = mapMaybe fromTask <$> getTasks 
 
-getAllNotDoneTodos :: IO [(String,String)]
-getAllNotDoneTodos = do
-  (Just k) <- getApiFromSettings
-  tasks <- getTodos k
-  case tasks of
-    Left err -> return [("ERROR",show err)]
-    Right tsks -> do
-                  let x = map (\i -> (i^.todoBase . taskId , i^.todoBase . text)) tsks
-                  return x
-
+getAllNotDoneTodos :: HMonad [(String,String)]
+getAllNotDoneTodos = map (\i -> (i^.todoBase . taskId , i^.todoBase . text)) <$> getTodos

@@ -68,7 +68,6 @@ instance FromJSON Task where
 
 data HabiticaError = ClientError ServantError
 type HMonad a = ReaderT HabiticaApiKey (EitherT ServantError IO) a
-type HMonad' a = EitherT ServantError (ReaderT HabiticaApiKey IO) a
 
 type Habitica a = EitherT ServantError IO a
 type HabiticaAuth a = HabiticaApiKey -> EitherT ServantError IO a
@@ -97,9 +96,6 @@ getStatus'
   :<|> updateTask'
   :<|> deleteTask' = client (Proxy :: Proxy HabiticaAPI) targetUrl
 
-runHMonad' :: HMonad' a -> HabiticaApiKey -> IO (Either String a)
-runHMonad' x key = left show <$> runReaderT (runEitherT x) key
-
 runHMonad :: HMonad a -> HabiticaApiKey -> IO (Either String a)
 runHMonad x key = left show <$> runEitherT (runReaderT x key)
 
@@ -123,8 +119,8 @@ todo :: String -> Task
 todo x = TaskTodo $ Todo (BaseTask "" Nothing x "" (fromList []) 0 0 "" ())
           False Nothing Nothing (Sublist [] True)
 
-getTodos :: HabiticaApiKey -> IO (Either String [Todo])
-getTodos key = right (filter (\x -> not $ x^.todoCompleted) . mapMaybe fromTask) <$> runHMonad getTasks key
+getTodos :: HMonad [Todo]
+getTodos = filter (\x -> not $ x^.todoCompleted) . mapMaybe fromTask <$> getTasks 
 
 
 findTasks :: HabiticaApiKey -> String -> IO (Either String [Task])
