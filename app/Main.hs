@@ -17,6 +17,7 @@ import           System.Directory           (getHomeDirectory)
 import           System.FilePath.Posix      ((</>))
 
 data HasbiticaCli = New { newTodoText :: String }
+               | User
                | List
                | ListAll
                | Done { guid :: String }
@@ -24,6 +25,7 @@ data HasbiticaCli = New { newTodoText :: String }
                  deriving (Show, Data, Typeable)
 
 examples = [ New {newTodoText = "Buy milk" &= help "The text of the new todo" }
+           , User &= help "Show user info"
            , List &= help "List all not-done todos"
            , ListAll &= help "List all todos"
            , Done "<GUID>" &= help "Mark todo with guid X as done"
@@ -35,6 +37,7 @@ myRun x k = either error id <$> runHMonad x k
   
 despatch :: HasbiticaCli -> HMonad String
 despatch (New x) = postTask (todo x) >> return "OK"
+despatch User = B.unpack . encode <$> getUser 
 despatch List = unlines <$>  map (\(a,b) -> a++" "++b) <$> getAllNotDoneTodos 
 despatch ListAll = show <$> (getAll :: HMonad [Todo])
 despatch (Done x) = doneTask x

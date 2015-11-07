@@ -13,7 +13,7 @@ import           Data.Map     (Map (..))
 import           Data.Time    (UTCTime)
 import Data.Aeson(Value)
 
-data HabiticaApiKey = HabiticaApiKey { authUser :: String, authApiKey :: String }
+data HabiticaApiKey = HabiticaApiKey { authUser :: String, authApiKey :: String } deriving Show
 
 data RequireAuth
 

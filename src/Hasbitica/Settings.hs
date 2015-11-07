@@ -4,7 +4,9 @@
 module Hasbitica.Settings where
 
 import           Control.Lens
+import           Control.Applicative ((<|>))
 import           Control.Monad.Trans.Either
+import           Data.Maybe(listToMaybe,maybeToList)
 import           Data.Aeson                 (FromJSON, decode)
 import qualified Data.ByteString.Lazy.Char8 as B
 import           GHC.Generics
@@ -23,7 +25,22 @@ instance FromJSON Settings
 readSettings :: IO (Maybe Settings)
 readSettings = fmap (</> ".habitica") getHomeDirectory >>= fmap decode . B.readFile
 
+readMultiSettings :: IO [Settings]
+readMultiSettings = fmap (</> ".habitica") getHomeDirectory >>= fmap (concat . decode) . B.readFile
+
+settingsToKey :: Settings -> HabiticaApiKey
+settingsToKey Settings{..} = HabiticaApiKey user key
+
 getApiFromSettings :: IO (Maybe HabiticaApiKey)
-getApiFromSettings = fmap x <$> readSettings
-  where
-    x Settings{..} =  HabiticaApiKey user key
+getApiFromSettings = do
+   sing <- readSettings
+   many <- readMultiSettings
+   return $ settingsToKey <$> (sing <|> (listToMaybe many))
+
+getAllApisFromSettings :: IO [HabiticaApiKey]
+getAllApisFromSettings = do
+   sing <- readSettings
+   many <- readMultiSettings
+   return $ settingsToKey <$> (maybeToList sing ++ many)
+
+

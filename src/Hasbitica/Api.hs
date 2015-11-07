@@ -9,6 +9,7 @@
 module Hasbitica.Api
     (getTasks
     ,getTask
+    ,getUser
     ,postTask
     ,HabiticaApiKey(..)
     ,todo
@@ -44,12 +45,14 @@ import           Servant.Common.Req         (ServantError)
 
 type HabiticaAPI = "api" :> "v2" :> (
        "status" :> Get '[JSON] Status
+  :<|> "user" :> RequireAuth :> Get '[JSON] Value
   :<|> "user" :> "tasks" :> (
-       RequireAuth :> Get '[JSON] [Task]
-  :<|> Capture "taskId" String :> RequireAuth :> Get '[JSON] Task
-  :<|> ReqBody '[JSON] Task :> RequireAuth :> Post '[JSON] Task
-  :<|> Capture "taskId" String :> ReqBody '[JSON] Task :> RequireAuth :> Put '[JSON] Task
-  :<|> Capture "taskId" String :> RequireAuth :> Delete '[JSON] NoData)
+           RequireAuth :> Get '[JSON] [Task] 
+      :<|> Capture "taskId" String :> RequireAuth :> Get '[JSON] Task 
+      :<|> ReqBody '[JSON] Task :> RequireAuth :> Post '[JSON] Task 
+      :<|> Capture "taskId" String :> ReqBody '[JSON] Task :> RequireAuth :> Put '[JSON] Task
+      :<|> Capture "taskId" String :> RequireAuth :> Delete '[JSON] NoData
+      )
   )
 
 instance ToJSON Task where
@@ -88,13 +91,16 @@ getTask' :: String -> HabiticaAuth Task
 postTask' :: Task -> HabiticaAuth Task
 updateTask' :: String -> Task -> HabiticaAuth Task
 deleteTask' :: String -> HabiticaAuth NoData
+getUser' :: HabiticaAuth Value
 
 getStatus'
+  :<|> getUser' 
   :<|> getTasks'
   :<|> getTask'
   :<|> postTask'
   :<|> updateTask'
-  :<|> deleteTask' = client (Proxy :: Proxy HabiticaAPI) targetUrl
+  :<|> deleteTask' 
+  = client (Proxy :: Proxy HabiticaAPI) targetUrl
 
 runHMonad :: HMonad a -> HabiticaApiKey -> IO (Either String a)
 runHMonad x key = left show <$> runEitherT (runReaderT x key)
@@ -104,12 +110,14 @@ getTask :: String -> HMonad Task
 postTask :: Task -> HMonad Task
 updateTask :: String -> Task -> HMonad Task
 deleteTask :: String -> HMonad NoData
+getUser :: HMonad Value
 
 getTasks = ask >>= lift . getTasks'
 getTask guid = ask >>= lift . getTask' guid
 postTask t = ask >>= lift . postTask' t
 updateTask guid task = ask >>= lift . updateTask' guid task
 deleteTask t = ask >>= lift . deleteTask' t
+getUser = ask >>= lift . getUser' 
   
 
 ---------------------------------------------------------------------
