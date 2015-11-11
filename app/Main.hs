@@ -1,16 +1,21 @@
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Control.Lens               ((&), (.~), (^.))
+import           Control.Lens               ((&), (.~), (^.),view)
 import           Data.Aeson                 (FromJSON, decode,encode)
+import qualified Data.Aeson.Lens as L
 import qualified Data.ByteString.Lazy.Char8 as B
+import qualified Data.Text as T
 import           Data.Maybe                 (catMaybes, mapMaybe)
 import           Data.Time.Clock            (getCurrentTime)
 import           Hasbitica.Api
 import           Hasbitica.LensStuff
+import Control.Monad(forM)
+import           Control.Monad.Trans.Reader (local)
 import           Control.Monad.Trans (liftIO)
-import           Hasbitica.Settings         (getApiFromSettings)
+import           Hasbitica.Settings         
 import           Servant.Common.Req         (responseBody)
 import           System.Console.CmdArgs
 import           System.Directory           (getHomeDirectory)
@@ -18,6 +23,7 @@ import           System.FilePath.Posix      ((</>))
 
 data HasbiticaCli = New { newTodoText :: String }
                | User
+               | UserNames
                | List
                | ListAll
                | Done { guid :: String }
@@ -26,6 +32,7 @@ data HasbiticaCli = New { newTodoText :: String }
 
 examples = [ New {newTodoText = "Buy milk" &= help "The text of the new todo" }
            , User &= help "Show user info"
+           , UserNames &= help "Show IDs and usernames of all users"
            , List &= help "List all not-done todos"
            , ListAll &= help "List all todos"
            , Done "<GUID>" &= help "Mark todo with guid X as done"
@@ -38,6 +45,7 @@ myRun x k = either error id <$> runHMonad x k
 despatch :: HasbiticaCli -> HMonad String
 despatch (New x) = postTask (todo x) >> return "OK"
 despatch User = B.unpack . encode <$> getUser 
+despatch UserNames = show <$> getUserNames
 despatch List = unlines <$>  map (\(a,b) -> a++" "++b) <$> getAllNotDoneTodos 
 despatch ListAll = show <$> (getAll :: HMonad [Todo])
 despatch (Done x) = doneTask x
@@ -48,6 +56,15 @@ main = do
        x <- cmdArgs (modes examples)
        (Just key) <- getApiFromSettings
        myRun (despatch x) key >>= putStrLn
+
+getUserNames :: HMonad [T.Text]
+getUserNames = do
+  allKeys <- liftIO getAllApisFromSettings
+  forM allKeys $ \k -> local (const k) $ 
+    view (L.key "profile" . L.key "name" . L._String) <$> getUser
+    
+  
+
 
 doneTask :: String -> HMonad String
 doneTask t = do

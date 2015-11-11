@@ -49,8 +49,11 @@ executable hasbitica-cli
                      , bytestring
                      , directory
                      , filepath
+                     , text
                      , aeson
                      , mtl
+                     , lens-aeson
+                     , transformers
                      , lens
                      , time
                      , cmdargs
