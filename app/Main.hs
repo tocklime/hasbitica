@@ -26,6 +26,7 @@ data HasbiticaCli = New { newTodoText :: String }
                | UserNames
                | List
                | ListAll
+               | ListMovable
                | Done { guid :: String }
                | Delete { guid :: String }
                  deriving (Show, Data, Typeable)
@@ -35,6 +36,7 @@ examples = [ New {newTodoText = "Buy milk" &= help "The text of the new todo" }
            , UserNames &= help "Show IDs and usernames of all users"
            , List &= help "List all not-done todos"
            , ListAll &= help "List all todos"
+           , ListMovable &= help "List all movable tasks"
            , Done "<GUID>" &= help "Mark todo with guid X as done"
            , Delete "<GUID>" &= help "Delete todo X"]
              &= program "hasbitica-cli"
@@ -48,6 +50,7 @@ despatch User = B.unpack . encode <$> getUser
 despatch UserNames = show <$> getUserNames
 despatch List = unlines <$>  map (\(a,b) -> a++" "++b) <$> getAllNotDoneTodos 
 despatch ListAll = show <$> (getAll :: HMonad [Todo])
+despatch ListMovable = show <$> getMovableTasks 
 despatch (Done x) = doneTask x
 despatch (Delete x) = show <$> deleteTask x 
 
@@ -63,9 +66,25 @@ getUserNames = do
   forM allKeys $ \k -> local (const k) $ 
     view (L.key "profile" . L.key "name" . L._String) <$> getUser
     
-  
+
+getTarget :: String -> Maybe String
+getTarget ('@':rest) = Just . takeWhile (/= ' ') $ rest
+getTarget _ = Nothing
+
+-- Would be nice if this was better.
+mapMaybeKeepOrig :: (a -> Maybe b) -> [a] -> [(a,b)]
+mapMaybeKeepOrig f [] = []
+mapMaybeKeepOrig f (x:xs) = case f x of
+  Nothing -> mapMaybeKeepOrig f xs
+  Just y -> (x,y) : mapMaybeKeepOrig f xs
 
 
+getMovableTasks :: HMonad [(Task,String)]
+getMovableTasks = do
+  allKeys <- liftIO getAllApisFromSettings
+  fmap concat <$> forM allKeys $ \k -> local (const k) $ 
+    mapMaybeKeepOrig (\i -> getTarget (toBase i ^. text)) <$> getTasks
+    
 doneTask :: String -> HMonad String
 doneTask t = do
   task <- getTask t
