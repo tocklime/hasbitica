@@ -5,17 +5,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
-module Hasbitica.Instances() where
+module Hasbitica.Instances(RequireAuth) where
 import           Control.Applicative   ((<|>))
 import           Control.Arrow         (first)
-import           Control.Monad         (guard, mzero)
-import           Data.Aeson            (FromJSON, ToJSON, Value (..), object,
-                                        parseJSON, toJSON, (.!=), (.:), (.:?),
-                                        (.=))
+import           Control.Monad         (mzero)
 import           Data.Aeson.Types
 import qualified Data.HashMap.Strict   as HM
 import           Data.List             (filter, map)
-import           Data.Map              (Map (..), fromList, mapKeys, toList)
+import           Data.Map              (Map, fromList, mapKeys, toList)
 import           Data.Maybe            (catMaybes, fromJust, isJust)
 import           Data.Proxy            (Proxy (..))
 import           Data.Scientific       (floatingOrInteger)
@@ -42,6 +39,8 @@ writeDOW Friday = "f"
 writeDOW Saturday = "s"
 writeDOW Sunday = "su"
 
+data RequireAuth
+
 instance HasClient sub => HasClient (RequireAuth :> sub) where
   type Client (RequireAuth :> sub) = HabiticaApiKey -> Client sub
 
@@ -55,9 +54,9 @@ instance HasClient sub => HasClient (RequireAuth :> sub) where
 
 instance FromJSON POSIXTime where
   parseJSON (Number n) = case floatingOrInteger n of
-                            Left f -> pure (realToFrac f/1000)
-                            Right i -> pure (fromIntegral i/1000)
-  parseJSON (String s) = undefined
+                            Left (f::Double) -> pure (realToFrac f/1000)
+                            Right (i::Integer) -> pure (fromIntegral i/1000)
+  parseJSON (String _) = undefined
   parseJSON x = error ("bad posixtime: " ++ show x)
 
 instance FromJSON TaskHistoryItem where
@@ -96,6 +95,7 @@ instance FromJSON BaseTask where
              <*> o .: "priority"
              <*> o .: "attribute"
              <*> pure ()
+  parseJSON _ = mzero
 
 removeMaybe :: Ord k =>Map (Maybe k) v -> Map k v
 removeMaybe = fromList . Data.List.map (first fromJust) . Data.List.filter (isJust . fst) . toList
@@ -103,6 +103,8 @@ removeMaybe = fromList . Data.List.map (first fromJust) . Data.List.filter (isJu
 
 instance FromJSON Sublist where
   parseJSON (Object o) = Sublist <$> o .:? "checklist" .!= [] <*> o .:? "collapseChecklist" .!= True
+  parseJSON _ = mzero
+
 instance ToJSON Sublist where
   toJSON Sublist{..} = object ["checklist" .= _checklist, "collapseChecklist" .= _collapse]
 instance FromJSON Todo where
@@ -113,6 +115,7 @@ instance FromJSON Todo where
          <*> o .:? "dateCompleted"
          <*> o .:? "date"
          <*> parseJSON v
+  parseJSON _ = mzero
 instance ToJSON Todo where
   toJSON Todo{..} = mergeValue _todoBase $
                   mergeValue _todoSublist $
@@ -126,6 +129,7 @@ instance FromJSON Reward where
   parseJSON v@(Object o) = do
     ("reward" :: String) <- o .: "type"
     Reward <$> parseJSON v
+  parseJSON _ = mzero
 instance ToJSON Reward where
   toJSON Reward{..} = mergeValue _rewardBase $ object [ "type" .= ("reward"::String) ]
 
@@ -140,6 +144,7 @@ instance FromJSON Daily where
           <*> o .: "completed"
           <*> (removeMaybe . mapKeys readDOW <$> o .: "repeat")
           <*> parseJSON v
+  parseJSON _ = mzero
 instance ToJSON Daily where
   toJSON Daily{..} = mergeValue _dailyBase $ mergeValue _dailySublist $ object
     [ "type" .= ("daily"::String)
@@ -157,6 +162,7 @@ instance FromJSON Habit where
           <*> o .: "history"
           <*> o .: "up"
           <*> o .: "down"
+  parseJSON _ = mzero
 instance ToJSON Habit where
   toJSON Habit{..} = mergeValue _habitBase $ object
     [ "type" .= ("habit"::String)
@@ -193,6 +199,8 @@ instance FromJSON Status where
     case s of
       "up" -> pure Up
       "down" -> pure Down
+      _ -> mzero
+  parseJSON _ = mzero
 
 instance HasBaseTask Todo where
    toBase = _todoBase

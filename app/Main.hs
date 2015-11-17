@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 module Main where
 
 import           Control.Lens               ((&), (.~), (^.),view)
@@ -8,11 +9,13 @@ import           Data.Aeson                 (FromJSON, decode,encode)
 import qualified Data.Aeson.Lens as L
 import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.Text as T
+import qualified Data.Map as M
+import Data.List (find)
 import           Data.Maybe                 (catMaybes, mapMaybe)
 import           Data.Time.Clock            (getCurrentTime)
 import           Hasbitica.Api
 import           Hasbitica.LensStuff
-import Control.Monad(forM)
+import Control.Monad(forM,void)
 import           Control.Monad.Trans.Reader (local)
 import           Control.Monad.Trans (liftIO)
 import           Hasbitica.Settings         
@@ -27,6 +30,7 @@ data HasbiticaCli = New { newTodoText :: String }
                | List
                | ListAll
                | ListMovable
+               | MoveTasks
                | Done { guid :: String }
                | Delete { guid :: String }
                  deriving (Show, Data, Typeable)
@@ -37,6 +41,7 @@ examples = [ New {newTodoText = "Buy milk" &= help "The text of the new todo" }
            , List &= help "List all not-done todos"
            , ListAll &= help "List all todos"
            , ListMovable &= help "List all movable tasks"
+           , MoveTasks &= help "Move all movable tasks"
            , Done "<GUID>" &= help "Mark todo with guid X as done"
            , Delete "<GUID>" &= help "Delete todo X"]
              &= program "hasbitica-cli"
@@ -51,6 +56,7 @@ despatch UserNames = show <$> getUserNames
 despatch List = unlines <$>  map (\(a,b) -> a++" "++b) <$> getAllNotDoneTodos 
 despatch ListAll = show <$> (getAll :: HMonad [Todo])
 despatch ListMovable = show <$> getMovableTasks 
+despatch MoveTasks = moveTasks 
 despatch (Done x) = doneTask x
 despatch (Delete x) = show <$> deleteTask x 
 
@@ -60,11 +66,11 @@ main = do
        (Just key) <- getApiFromSettings
        myRun (despatch x) key >>= putStrLn
 
-getUserNames :: HMonad [T.Text]
+getUserNames :: HMonad [(String, Guid)]
 getUserNames = do
   allKeys <- liftIO getAllApisFromSettings
   forM allKeys $ \k -> local (const k) $ 
-    view (L.key "profile" . L.key "name" . L._String) <$> getUser
+    (, authUser k) . T.unpack . view (L.key "profile" . L.key "name" . L._String) <$> getUser
     
 
 getTarget :: String -> Maybe String
@@ -79,12 +85,33 @@ mapMaybeKeepOrig f (x:xs) = case f x of
   Just y -> (x,y) : mapMaybeKeepOrig f xs
 
 
-getMovableTasks :: HMonad [(Task,String)]
+getMovableTasks :: HMonad [(Guid,Task,String)]
 getMovableTasks = do
   allKeys <- liftIO getAllApisFromSettings
   fmap concat <$> forM allKeys $ \k -> local (const k) $ 
-    mapMaybeKeepOrig (\i -> getTarget (toBase i ^. text)) <$> getTasks
-    
+    map (uncurry (authUser k ,,)) . mapMaybeKeepOrig (\i -> getTarget (toBase i ^. text)) <$> getTasks
+
+
+moveTask :: Task -> Guid -> Guid -> HMonad ()
+moveTask t from to = do
+  keys <- liftIO getAllApisFromSettings
+  let (Just fromKey) = find ((== from) . authUser) keys
+  let (Just toKey) = find ((== to) . authUser) keys
+  void $ local (const fromKey) (deleteTask (toBase t ^. taskId)) 
+  void $ local (const toKey) (postTask t) 
+
+moveTasks :: HMonad String
+moveTasks = do
+  tasks <- getMovableTasks
+  users <- M.fromList <$> getUserNames
+  keys <- liftIO getAllApisFromSettings
+  count <- forM tasks $ \(sourceGuid, t, targetName) -> do
+    let targetUser = users M.! targetName
+    if targetUser == sourceGuid then return 0 else do
+      moveTask t sourceGuid targetUser
+      return 1
+  return $ "Moved "++show (sum count)++" tasks." 
+  
 doneTask :: String -> HMonad String
 doneTask t = do
   task <- getTask t

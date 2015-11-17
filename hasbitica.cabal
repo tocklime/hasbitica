@@ -52,6 +52,7 @@ executable hasbitica-cli
                      , text
                      , aeson
                      , mtl
+                     , containers
                      , lens-aeson
                      , transformers
                      , lens
