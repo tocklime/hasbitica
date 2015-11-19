@@ -9,7 +9,7 @@ import           Data.Aeson                 (FromJSON, decode,encode)
 import qualified Data.Aeson.Lens as L
 import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.Text as T
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Data.List (find)
 import           Data.Maybe                 (catMaybes, mapMaybe)
 import           Data.Time.Clock            (getCurrentTime)
@@ -105,11 +105,10 @@ moveTasks = do
   tasks <- getMovableTasks
   users <- M.fromList <$> getUserNames
   keys <- liftIO getAllApisFromSettings
-  count <- forM tasks $ \(sourceGuid, t, targetName) -> do
-    let targetUser = users M.! targetName
-    if targetUser == sourceGuid then return 0 else do
-      moveTask t sourceGuid targetUser
-      return 1
+  count <- forM tasks $ \(sourceGuid, t, targetName) -> 
+    case targetName `M.lookup` users of
+      Just x | x /= sourceGuid -> moveTask t sourceGuid x >> return 1
+      _ -> return 0
   return $ "Moved "++show (sum count)++" tasks." 
   
 doneTask :: String -> HMonad String
