@@ -3,16 +3,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Hasbitica.Settings where
 
-import           Control.Lens
 import           Control.Applicative ((<|>))
-import           Control.Monad.Trans.Either
 import           Data.Maybe(listToMaybe,maybeToList)
 import           Data.Aeson                 (FromJSON, decode)
 import qualified Data.ByteString.Lazy.Char8 as B
 import           GHC.Generics
 import           Hasbitica.Api
-import           Hasbitica.LensStuff
-import           Servant.Common.Req
 import           System.Directory           (getHomeDirectory)
 import           System.FilePath.Posix      ((</>))
 

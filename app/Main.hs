@@ -5,13 +5,13 @@
 module Main where
 
 import           Control.Lens               ((&), (.~), (^.),view)
-import           Data.Aeson                 (FromJSON, decode,encode)
+import           Data.Aeson                 (encode)
 import qualified Data.Aeson.Lens as L
 import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import Data.List (find)
-import           Data.Maybe                 (catMaybes, mapMaybe)
+import           Data.Maybe                 (mapMaybe)
 import           Data.Time.Clock            (getCurrentTime)
 import           Hasbitica.Api
 import           Hasbitica.LensStuff
@@ -19,10 +19,7 @@ import Control.Monad(forM,void)
 import           Control.Monad.Trans.Reader (local)
 import           Control.Monad.Trans (liftIO)
 import           Hasbitica.Settings         
-import           Servant.Common.Req         (responseBody)
 import           System.Console.CmdArgs
-import           System.Directory           (getHomeDirectory)
-import           System.FilePath.Posix      ((</>))
 
 data HasbiticaCli = New { newTodoText :: String }
                | User
@@ -35,6 +32,7 @@ data HasbiticaCli = New { newTodoText :: String }
                | Delete { guid :: String }
                  deriving (Show, Data, Typeable)
 
+examples :: [HasbiticaCli]
 examples = [ New {newTodoText = "Buy milk" &= help "The text of the new todo" }
            , User &= help "Show user info"
            , UserNames &= help "Show IDs and usernames of all users"
@@ -63,8 +61,8 @@ despatch (Delete x) = show <$> deleteTask x
 main :: IO ()
 main = do
        x <- cmdArgs (modes examples)
-       (Just key) <- getApiFromSettings
-       myRun (despatch x) key >>= putStrLn
+       (Just k) <- getApiFromSettings
+       myRun (despatch x) k >>= putStrLn
 
 getUserNames :: HMonad [(String, Guid)]
 getUserNames = do
@@ -79,7 +77,7 @@ getTarget _ = Nothing
 
 -- Would be nice if this was better.
 mapMaybeKeepOrig :: (a -> Maybe b) -> [a] -> [(a,b)]
-mapMaybeKeepOrig f [] = []
+mapMaybeKeepOrig _ [] = []
 mapMaybeKeepOrig f (x:xs) = case f x of
   Nothing -> mapMaybeKeepOrig f xs
   Just y -> (x,y) : mapMaybeKeepOrig f xs
@@ -104,8 +102,7 @@ moveTasks :: HMonad String
 moveTasks = do
   tasks <- getMovableTasks
   users <- M.fromList <$> getUserNames
-  keys <- liftIO getAllApisFromSettings
-  count <- forM tasks $ \(sourceGuid, t, targetName) -> 
+  count :: [Int] <- forM tasks $ \(sourceGuid, t, targetName) -> 
     case targetName `M.lookup` users of
       Just x | x /= sourceGuid -> moveTask t sourceGuid x >> return 1
       _ -> return 0
