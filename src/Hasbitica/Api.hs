@@ -78,6 +78,7 @@ instance FromJSON NoData where
   parseJSON = withObject "NoData" $ \o ->
                  if HM.null o then pure NoData else fail "Expected empty object"
 
+targetUrl :: BaseUrl
 targetUrl = BaseUrl Https "habitica.com" 443
 
 getStatus' :: Habitica Status

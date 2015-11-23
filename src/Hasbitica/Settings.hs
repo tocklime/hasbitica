@@ -31,7 +31,7 @@ getApiFromSettings :: IO (Maybe HabiticaApiKey)
 getApiFromSettings = do
    sing <- readSettings
    many <- readMultiSettings
-   return $ settingsToKey <$> (sing <|> (listToMaybe many))
+   return $ settingsToKey <$> (sing <|> listToMaybe many)
 
 getAllApisFromSettings :: IO [HabiticaApiKey]
 getAllApisFromSettings = do
