@@ -21,6 +21,7 @@ module Hasbitica.Api
     ,runHMonad
     ,HMonad
     ,findTasks
+    ,getPartyChat
     ) where
 import           Control.Arrow
 import           Control.Lens
@@ -58,6 +59,7 @@ instance HasClient sub => HasClient (RequireAuth :> sub) where
 type HabiticaAPI = "api" :> "v2" :> (
        "status" :> Get '[JSON] Status
   :<|> "user" :> RequireAuth :> Get '[JSON] Value
+  :<|> "groups" :> "party" :> "chat" :> RequireAuth :> Get '[JSON] [Chat]
   :<|> "user" :> "tasks" :> (
            RequireAuth :> Get '[JSON] [Task] 
       :<|> Capture "taskId" String :> RequireAuth :> Get '[JSON] Task 
@@ -88,9 +90,11 @@ postTask' :: Task -> HabiticaAuth Task
 updateTask' :: String -> Task -> HabiticaAuth Task
 deleteTask' :: String -> HabiticaAuth NoData
 getUser' :: HabiticaAuth Value
+getPartyChat' :: HabiticaAuth [Chat]
 
 getStatus'
   :<|> getUser' 
+  :<|> getPartyChat'
   :<|> getTasks'
   :<|> getTask'
   :<|> postTask'
@@ -108,6 +112,7 @@ postTask :: Task -> HMonad Task
 updateTask :: String -> Task -> HMonad Task
 deleteTask :: String -> HMonad NoData
 getUser :: HMonad Value
+getPartyChat :: HMonad [Chat]
 
 getStatus = lift getStatus'
 getTasks = ask >>= lift . getTasks'
@@ -116,6 +121,7 @@ postTask t = ask >>= lift . postTask' t
 updateTask guid task = ask >>= lift . updateTask' guid task
 deleteTask t = ask >>= lift . deleteTask' t
 getUser = ask >>= lift . getUser' 
+getPartyChat = ask >>= lift . getPartyChat'
   
 
 ---------------------------------------------------------------------

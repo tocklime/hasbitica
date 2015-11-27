@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 module Main where
@@ -27,6 +28,7 @@ data HasbiticaCli = New { newTodoText :: String }
                | List
                | ListAll
                | ListMovable
+               | ShowRecentChat
                | MoveTasks
                | Done { guid :: String }
                | Delete { guid :: String }
@@ -40,6 +42,7 @@ examples = [ New {newTodoText = "Buy milk" &= help "The text of the new todo" }
            , ListAll &= help "List all todos"
            , ListMovable &= help "List all movable tasks"
            , MoveTasks &= help "Move all movable tasks"
+           , ShowRecentChat &= help "Show recent party chat messages"
            , Done "<GUID>" &= help "Mark todo with guid X as done"
            , Delete "<GUID>" &= help "Delete todo X"]
              &= program "hasbitica-cli"
@@ -57,6 +60,11 @@ despatch ListMovable = show <$> getMovableTasks
 despatch MoveTasks = moveTasks 
 despatch (Done x) = doneTask x
 despatch (Delete x) = show <$> deleteTask x 
+despatch ShowRecentChat = unlines . map showChat <$> getPartyChat 
+
+
+showChat :: Chat -> String
+showChat Chat{..} = (maybe _chatUuid id _chatUser) ++ ": " ++ _chatText
 
 main :: IO ()
 main = do

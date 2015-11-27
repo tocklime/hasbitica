@@ -287,6 +287,23 @@ instance HasBaseTask Task where
    toBase (TaskReward a) = toBase a
    fromTask = Just
 
+--Chat message
+data Chat = Chat 
+  { _chatText :: String
+  , _chatUuid :: String
+  , _chatUser :: Maybe String
+  , _chatId :: Guid
+  , _chatTimestamp :: UTCTime } deriving (Show)
+
+instance FromJSON Chat where
+  parseJSON (Object o) = 
+    Chat <$> o .: "text"
+          <*> o .: "uuid"
+          <*> o .:? "user"
+          <*> o .: "id"
+          <*> (posixSecondsToUTCTime . toPosix <$> o .: "timestamp")
+  parseJSON _ = mzero
+
 removeMaybe :: Ord k =>Map (Maybe k) v -> Map k v
 removeMaybe = fromList . Data.List.map (first fromJust) . Data.List.filter (isJust . fst) . toList
 
@@ -296,6 +313,9 @@ mergeValue a (Object b) = case toJSON a of
   _ -> Object b
 mergeValue a _ = toJSON a
 
+
+
+
 makeLenses ''BaseTask
 makeLenses ''Todo
 makeLenses ''Reward
@@ -303,3 +323,4 @@ makeLenses ''Daily
 makeLenses ''Habit
 makeLenses ''Sublist
 makeLenses ''TaskHistoryItem
+makeLenses ''Chat
