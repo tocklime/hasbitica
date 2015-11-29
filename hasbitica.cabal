@@ -18,9 +18,11 @@ library
   exposed-modules:     Hasbitica.Api
                      , Hasbitica.LensStuff
                      , Hasbitica.Settings
+                     , Hasbitica.SystemChatParse
   build-depends:       base >= 4.7 && < 5
                      , text
                      , aeson
+                     , attoparsec
                      , wreq
                      , lens
                      , servant-client >= 0.4.4.5
