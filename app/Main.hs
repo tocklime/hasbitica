@@ -21,6 +21,8 @@ import           Control.Monad.Trans.Reader (local)
 import           Control.Monad.Trans (liftIO)
 import           Hasbitica.Settings         
 import           System.Console.CmdArgs
+import Network.HTTP.Client (newManager)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 data HasbiticaCli = New { newTodoText :: String }
                | User
@@ -47,7 +49,7 @@ examples = [ New {newTodoText = "Buy milk" &= help "The text of the new todo" }
            , Delete "<GUID>" &= help "Delete todo X"]
              &= program "hasbitica-cli"
 
-myRun :: HMonad a -> HabiticaApiKey -> IO a
+myRun :: HMonad a -> HabiticaContext -> IO a
 myRun x k = either error id <$> runHMonad x k
   
 despatch :: HasbiticaCli -> HMonad String
@@ -70,12 +72,17 @@ main :: IO ()
 main = do
        x <- cmdArgs (modes examples)
        (Just k) <- getApiFromSettings
-       myRun (despatch x) k >>= putStrLn
+       manager <- newManager tlsManagerSettings
+       let ctxt = HabiticaContext k manager
+       myRun (despatch x) ctxt >>= putStrLn
+
+useKey :: HabiticaApiKey -> HabiticaContext -> HabiticaContext
+useKey k c = c {contextKey = k}
 
 getUserNames :: HMonad [(String, Guid)]
 getUserNames = do
   allKeys <- liftIO getAllApisFromSettings
-  forM allKeys $ \k -> local (const k) $ 
+  forM allKeys $ \k -> local (useKey k) $ 
     (, authUser k) . T.unpack . view (L.key "profile" . L.key "name" . L._String) <$> getUser
     
 
@@ -94,7 +101,7 @@ mapMaybeKeepOrig f (x:xs) = case f x of
 getMovableTasks :: HMonad [(Guid,Task,String)]
 getMovableTasks = do
   allKeys <- liftIO getAllApisFromSettings
-  fmap concat <$> forM allKeys $ \k -> local (const k) $ 
+  fmap concat <$> forM allKeys $ \k -> local (useKey k) $ 
     map (uncurry (authUser k ,,)) . mapMaybeKeepOrig (\i -> getTarget (toBase i ^. text)) <$> getTasks
 
 
@@ -103,8 +110,8 @@ moveTask t from to = do
   keys <- liftIO getAllApisFromSettings
   let (Just fromKey) = find ((== from) . authUser) keys
   let (Just toKey) = find ((== to) . authUser) keys
-  void $ local (const fromKey) (deleteTask (toBase t ^. taskId)) 
-  void $ local (const toKey) (postTask t) 
+  void $ local (useKey fromKey) (deleteTask (toBase t ^. taskId)) 
+  void $ local (useKey toKey) (postTask t) 
 
 moveTasks :: HMonad String
 moveTasks = do

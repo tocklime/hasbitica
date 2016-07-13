@@ -24,7 +24,10 @@ import           Data.Scientific       (floatingOrInteger)
 import           Data.Time             (UTCTime)
 import           Data.Time.Clock.POSIX (POSIXTime, posixSecondsToUTCTime)
 
-data HabiticaApiKey = HabiticaApiKey { authUser :: String, authApiKey :: String } deriving Show
+data HabiticaApiKey = HabiticaApiKey { 
+        authUser :: String,
+        authApiKey :: String
+   } deriving Show
 
 type Guid = String
 
