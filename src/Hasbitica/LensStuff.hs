@@ -38,6 +38,12 @@ instance FromJSON MyPosixTime where
                             Right (i::Integer) -> pure $ MyPosix (fromIntegral i/1000)
   parseJSON _ = mzero
 
+data HabiticaResponse a = Success a | Error String deriving Show
+instance FromJSON a => FromJSON (HabiticaResponse a) where
+  parseJSON (Object o) = 
+    Error <$> (o .: "error") <|> Success <$> (o .: "data")
+
+
 -- TaskHistoryItem
 data TaskHistoryItem = TaskHistoryItem { _histValue :: Double, _histDate :: UTCTime }
   deriving Show
@@ -56,7 +62,7 @@ data BaseTask = BaseTask
   , _dateCreated :: Maybe UTCTime
   , _text        :: String
   , _notes       :: String
-  , _tags        :: Map Guid Bool
+  , _tags        :: [Guid]
   , _taskValue   :: Double
   , _priority    :: Int
   , _attribute   :: String
@@ -66,7 +72,7 @@ data BaseTask = BaseTask
 instance FromJSON BaseTask where
   parseJSON (Object o) =
     BaseTask <$> o .: "id"
-             <*> o .: "dateCreated"
+             <*> o .: "createdAt"
              <*> o .: "text"
              <*> o .: "notes"
              <*> o .: "tags"
@@ -195,7 +201,7 @@ instance FromJSON Todo where
     Todo <$> parseJSON v
          <*> o .: "completed"
          <*> o .:? "dateCompleted"
-         <*> o .:? "date"
+         <*> (o .:? "date" <|> return Nothing)
          <*> parseJSON v
   parseJSON _ = mzero
 instance ToJSON Todo where
